@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% block title %}{{ result.info.item_name if result else "Паспорт блюда" }} — Гастродом №3{% endblock %}
+{% block content %}
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+{% if result %}
+{% set info = result.info %}
+{% set summary = result.summary %}
+{% set cls = result.classification %}
+
+<section class="item-hero">
+    <div class="item-hero-main">
+        <div class="eyebrow">ПАСПОРТ БЛЮДА</div>
+        <h1>{{ info.item_name }}</h1>
+        <div class="item-hero-meta">
+            {% if info.current_price is not none %}
+            <span class="item-price">
+                {{ "{:,.0f}".format(info.current_price).replace(",", " ") }} ₽
+            </span>
+            {% endif %}
+            <span class="class-badge abc-{{ cls.abc|lower }}">{{ cls.abc }}</span>
+            <span class="class-badge xyz-{{ cls.xyz|lower }}">{{ cls.xyz }}</span>
+            <strong>{{ cls.matrix }}</strong>
+            <span>ТОП {{ cls.rank }} из {{ cls.items_count }}</span>
+        </div>
+        {% if info.description %}
+        <p>{{ info.description }}</p>
+        {% endif %}
+    </div>
+
+    <div class="health-card health-{{ result.health.status }}">
+        <div class="health-label">HEALTH SCORE</div>
+        <div class="health-score">{{ result.health.score }}</div>
+        <div class="health-caption">{{ result.health.label }}</div>
+        <div class="health-progress">
+            <span style="width: {{ result.health.score }}%"></span>
+        </div>
+    </div>
+</section>
+
+<section class="panel filter-panel">
+    <form method="get" class="period-form">
+        <div>
+            <label>Дата с</label>
+            <input type="date" name="date_from" value="{{ summary.date_from }}">
+        </div>
+        <div>
+            <label>Дата по</label>
+            <input type="date" name="date_to" value="{{ summary.date_to }}">
+        </div>
+        <div class="period-actions">
+            <button type="submit">Показать</button>
+            <a class="button-link secondary-link" href="/menu/item/{{ info.item_id }}">
+                Последние 30 дней
+            </a>
+        </div>
+    </form>
+</section>
+
+<section class="item-kpi-grid">
+    <article class="kpi-card">
+        <div class="kpi-label">Продано</div>
+        <div class="kpi-value">
+            {{ "{:,.0f}".format(summary.quantity).replace(",", " ") }}
+        </div>
+        <div class="kpi-meta">
+            {% if summary.quantity_change is not none %}
+                {{ "+" if summary.quantity_change >= 0 else "" }}{{ summary.quantity_change }}% к прошлому периоду
+            {% else %}
+                нет базы сравнения
+            {% endif %}
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Выручка</div>
+        <div class="kpi-value">
+            {{ "{:,.0f}".format(summary.revenue).replace(",", " ") }} ₽
+        </div>
+        <div class="kpi-meta">
+            Доля меню: {{ cls.share }}%
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Средняя цена</div>
+        <div class="kpi-value">
+            {{ "{:,.2f}".format(summary.avg_price).replace(",", " ") }} ₽
+        </div>
+        <div class="kpi-meta">
+            {{ summary.checks_count }} чек.
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">В среднем за день</div>
+        <div class="kpi-value">
+            {{ "{:,.1f}".format(summary.avg_daily_quantity).replace(",", " ") }}
+        </div>
+        <div class="kpi-meta">
+            Последняя продажа:
+            {{ summary.last_sale.strftime("%d.%m %H:%M") if summary.last_sale else "—" }}
+        </div>
+    </article>
+</section>
+
+<section class="item-layout">
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">ДИНАМИКА</div>
+                <h2>Продажи по дням</h2>
+            </div>
+        </div>
+        <div class="chart-wrap large">
+            <canvas id="itemDailyChart"></canvas>
+        </div>
+    </article>
+
+    <article class="panel forecast-card">
+        <div class="eyebrow">ПРОГНОЗ</div>
+        <h2>Следующие 7 дней</h2>
+        <div class="forecast-main">
+            {{ result.forecast.next_7_quantity }} продаж
+        </div>
+        <div class="forecast-money">
+            {{ "{:,.0f}".format(result.forecast.next_7_revenue).replace(",", " ") }} ₽
+        </div>
+        <div class="forecast-confidence">
+            Уверенность прогноза: {{ result.forecast.confidence }}%
+        </div>
+    </article>
+</section>
+
+<section class="item-layout">
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">СПРОС</div>
+                <h2>Продажи по часам</h2>
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="itemHourlyChart"></canvas>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">СВЯЗКИ</div>
+                <h2>С чем покупают</h2>
+            </div>
+        </div>
+        {% if result.links %}
+        <div class="item-link-list">
+            {% for link in result.links %}
+            <a class="item-related-card" href="/menu/item/{{ link.related_id }}?date_from={{ summary.date_from }}&date_to={{ summary.date_to }}">
+                <div>
+                    <strong>{{ link.related_name }}</strong>
+                    <span>{{ link.pair_checks }} совместных чеков</span>
+                </div>
+                <div class="related-confidence">{{ link.confidence }}%</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Связки не найдены.</p>
+        {% endif %}
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ТЕПЛОВАЯ КАРТА</div>
+            <h2>Когда покупают блюдо</h2>
+        </div>
+    </div>
+    <div class="heatmap-wrap">
+        <table class="heatmap-table">
+            <thead>
+                <tr>
+                    <th>День</th>
+                    {% for hour in range(10, 24) %}
+                    <th>{{ "%02d"|format(hour) }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for day_number, day_name in [(2,"Пн"),(3,"Вт"),(4,"Ср"),(5,"Чт"),(6,"Пт"),(7,"Сб"),(1,"Вс")] %}
+                <tr>
+                    <th>{{ day_name }}</th>
+                    {% for hour in range(10, 24) %}
+                    {% set cell = result.heatmap
+                        | selectattr("weekday_number", "equalto", day_number)
+                        | selectattr("hour", "equalto", hour)
+                        | first %}
+                    <td
+                        class="heat-cell"
+                        style="--heat: {{ cell.intensity if cell else 0 }}%"
+                        title="{{ day_name }} {{ "%02d"|format(hour) }}:00 — {{ cell.quantity if cell else 0 }} шт."
+                    >
+                        {% if cell and cell.quantity > 0 %}
+                            {{ "{:,.0f}".format(cell.quantity).replace(",", " ") }}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">DECISION CENTER</div>
+            <h2>Что делать с этой позицией</h2>
+        </div>
+    </div>
+    <div class="insight-grid">
+        {% for insight in result.insights %}
+        <article class="insight-card insight-{{ insight.level }}">
+            <h3>{{ insight.title }}</h3>
+            <p>{{ insight.text }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+const dailyLabels = {{ result.daily | map(attribute='sale_date') | list | tojson }};
+const dailyQuantity = {{ result.daily | map(attribute='quantity') | list | tojson }};
+const dailyRevenue = {{ result.daily | map(attribute='revenue') | list | tojson }};
+
+new Chart(document.getElementById('itemDailyChart'), {
+    data: {
+        labels: dailyLabels,
+        datasets: [{
+            type: 'bar',
+            label: 'Продано',
+            data: dailyQuantity,
+            backgroundColor: '#a53124',
+            borderRadius: 7,
+            yAxisID: 'quantity'
+        }, {
+            type: 'line',
+            label: 'Выручка',
+            data: dailyRevenue,
+            borderColor: '#6e625b',
+            backgroundColor: '#6e625b',
+            tension: .35,
+            pointRadius: 3,
+            yAxisID: 'money'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+            x: { grid: { display: false } },
+            quantity: {
+                position: 'left',
+                beginAtZero: true,
+                ticks: { precision: 0 }
+            },
+            money: {
+                position: 'right',
+                beginAtZero: true,
+                grid: { display: false },
+                ticks: {
+                    callback: value =>
+                        new Intl.NumberFormat('ru-RU').format(value) + ' ₽'
+                }
+            }
+        }
+    }
+});
+
+const hourlyLabels = {{ result.hourly | map(attribute='sale_hour') | list | tojson }}.map(
+    hour => String(hour).padStart(2, '0') + ':00'
+);
+const hourlyQuantity = {{ result.hourly | map(attribute='quantity') | list | tojson }};
+
+new Chart(document.getElementById('itemHourlyChart'), {
+    type: 'bar',
+    data: {
+        labels: hourlyLabels,
+        datasets: [{
+            data: hourlyQuantity,
+            backgroundColor: '#a53124',
+            borderRadius: 7
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

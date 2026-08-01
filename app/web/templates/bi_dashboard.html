@@ -34,15 +34,28 @@
                 value="{{ analysis.date_to }}"
             >
         </div>
-        <div class="period-actions">
+        <div>
+            <label>Режим XYZ</label>
+            <select name="xyz_mode">
+                <option value="adaptive" {{ "selected" if xyz_mode != "classic" else "" }}>Адаптивный</option>
+                <option value="classic" {{ "selected" if xyz_mode == "classic" else "" }}>Классический</option>
+            </select>
+        </div>
+        <div class="period-actions bi-filter-actions">
             <button type="submit">Показать</button>
-            <a class="button-link secondary-link" href="/bi">
-                Последние 30 дней
-            </a>
+            <a class="button-link secondary-link" href="/bi">Последние 30 дней</a>
+            <a class="button-link export-link"
+               href="/bi/export.csv?date_from={{ analysis.date_from }}&date_to={{ analysis.date_to }}&xyz_mode={{ xyz_mode }}">CSV</a>
         </div>
     </form>
 </section>
-
+<div class="alert info">
+{% if analysis.xyz_mode == "adaptive" %}
+XYZ распределён адаптивно: X — наиболее стабильная треть, Y — средняя, Z — наиболее нестабильная.
+{% else %}
+Классический XYZ: X ≤ 10%, Y ≤ 25%, Z > 25% коэффициента вариации.
+{% endif %}
+</div>
 <section class="kpi-grid bi-kpis">
     <article class="kpi-card">
         <div class="kpi-label">Выручка периода</div>
@@ -52,17 +65,17 @@
     </article>
     <article class="kpi-card">
         <div class="kpi-label">Класс A</div>
-        <div class="kpi-value">{{ analysis.a_count }}</div>
+        <div class="kpi-value">{{ result.analysis.a_count }}</div>
         <div class="kpi-meta">ключевые позиции</div>
     </article>
     <article class="kpi-card">
         <div class="kpi-label">Стабильные X</div>
-        <div class="kpi-value">{{ analysis.x_count }}</div>
+        <div class="kpi-value">{{ result.analysis.x_count }}</div>
         <div class="kpi-meta">предсказуемый спрос</div>
     </article>
     <article class="kpi-card">
         <div class="kpi-label">Нестабильные Z</div>
-        <div class="kpi-value">{{ analysis.z_count }}</div>
+        <div class="kpi-value">{{ result.analysis.z_count }}</div>
         <div class="kpi-meta">нерегулярный спрос</div>
     </article>
 </section>
@@ -143,8 +156,10 @@
                     <span>+</span>
                     <strong>{{ row.item_b }}</strong>
                 </div>
-                <div class="basket-count">
-                    {{ row.pair_count }} раз
+                <div class="basket-metrics">
+                    <strong>{{ row.pair_count }} раз</strong>
+                    <span>Достоверность: {{ row.confidence_a_to_b }}%</span>
+                    <span>Lift: {{ row.lift }}</span>
                 </div>
             </div>
             {% endfor %}
@@ -165,6 +180,29 @@
             <canvas id="weekdayChart"></canvas>
         </div>
     </article>
+</section>
+
+
+<section class="panel">
+<div class="panel-title-row"><div><div class="eyebrow">ТЕПЛОВАЯ КАРТА</div><h2>Выручка: день недели × час</h2></div></div>
+<div class="heatmap-wrap">
+<table class="heatmap-table">
+<thead><tr><th>День</th>{% for hour in range(10,24) %}<th>{{ "%02d"|format(hour) }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for day_number, day_name in [(2,"Пн"),(3,"Вт"),(4,"Ср"),(5,"Чт"),(6,"Пт"),(7,"Сб"),(1,"Вс")] %}
+<tr><th>{{ day_name }}</th>
+{% for hour in range(10,24) %}
+{% set cell = result.heatmap | selectattr("weekday_number","equalto",day_number) | selectattr("hour","equalto",hour) | first %}
+<td class="heat-cell" style="--heat: {{ cell.intensity if cell else 0 }}%"
+title="{{ day_name }} {{ "%02d"|format(hour) }}:00 — {{ "{:,.0f}".format(cell.revenue if cell else 0).replace(",", " ") }} ₽">
+{% if cell and cell.revenue > 0 %}{{ "{:,.0f}".format(cell.revenue).replace(",", " ") }}{% endif %}
+</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
 </section>
 
 <section class="panel">
@@ -192,7 +230,7 @@
             <h2>ABC/XYZ по меню</h2>
         </div>
         <div class="period-caption">
-            {{ analysis.items|length }} позиций
+            {{ analysis["items"]|length }} позиций
         </div>
     </div>
 
@@ -211,9 +249,13 @@
                 </tr>
             </thead>
             <tbody>
-            {% for item in analysis.items %}
+            {% for item in analysis["items"] %}
                 <tr>
-                    <td><strong>{{ item.item_name }}</strong></td>
+                    <td>
+        <a class="item-link" href="/menu/item/{{ item.item_id }}?date_from={{ analysis.date_from }}&date_to={{ analysis.date_to }}">
+            <strong>{{ item.item_name }}</strong>
+        </a>
+    </td>
                     <td><span class="class-badge abc-{{ item.abc|lower }}">{{ item.abc }}</span></td>
                     <td><span class="class-badge xyz-{{ item.xyz|lower }}">{{ item.xyz }}</span></td>
                     <td><strong>{{ item.matrix }}</strong></td>
@@ -245,9 +287,9 @@ new Chart(document.getElementById('abcChart'), {
         labels: ['A', 'B', 'C'],
         datasets: [{
             data: [
-                {{ analysis.a_count }},
-                {{ analysis.b_count }},
-                {{ analysis.c_count }}
+                {{ result.analysis.a_count }},
+                {{ result.analysis.b_count }},
+                {{ result.analysis.c_count }}
             ],
             backgroundColor: ['#a53124', '#d28b35', '#776b64'],
             borderWidth: 0
@@ -269,9 +311,9 @@ new Chart(document.getElementById('xyzChart'), {
         labels: ['X', 'Y', 'Z'],
         datasets: [{
             data: [
-                {{ analysis.x_count }},
-                {{ analysis.y_count }},
-                {{ analysis.z_count }}
+                {{ result.analysis.x_count }},
+                {{ result.analysis.y_count }},
+                {{ result.analysis.z_count }}
             ],
             backgroundColor: ['#4d7c63', '#d28b35', '#a53124'],
             borderWidth: 0

@@ -1,7 +1,9 @@
 from datetime import date
+import csv
+import io
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from app.db.sql_server import SqlServer, SqlServerError
@@ -13,6 +15,7 @@ from app.services.menu_service import MenuService
 from app.services.finance_service import FinanceService
 from app.services.operations_service import OperationsService
 from app.services.bi_service import BIService
+from app.services.item_service import ItemService
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/web/templates")
@@ -38,24 +41,9 @@ def home(request: Request):
     )
 
 
-@router.get("/sql", response_class=HTMLResponse)
-def sql_dashboard(request: Request):
-    data = None
-    error = None
-
-    try:
-        data = DashboardService().load()
-    except SqlServerError as exc:
-        error = str(exc)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="sql_dashboard.html",
-        context={
-            "data": data,
-            "error": error,
-        },
-    )
+@router.get("/sql")
+def sql_dashboard():
+    return RedirectResponse(url="/", status_code=302)
 
 
 @router.get("/sql-test")
@@ -245,21 +233,78 @@ def bi_dashboard(
     request: Request,
     date_from: date | None = None,
     date_to: date | None = None,
+    xyz_mode: str = "adaptive",
+):
+    result = None
+    error = None
+    try:
+        result = BIService().load(date_from, date_to, xyz_mode)
+    except SqlServerError as exc:
+        error = str(exc)
+    return templates.TemplateResponse(
+        request=request,
+        name="bi_dashboard.html",
+        context={"result": result, "error": error, "xyz_mode": xyz_mode},
+    )
+
+
+@router.get("/bi/export.csv")
+def bi_export_csv(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    xyz_mode: str = "adaptive",
+):
+    result = BIService().load(date_from, date_to, xyz_mode)
+    analysis = result["analysis"]
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow([
+        "Позиция", "ABC", "XYZ", "Матрица",
+        "Продано", "Выручка", "Доля, %", "Вариация, %",
+    ])
+    for item in analysis["items"]:
+        writer.writerow([
+            item["item_name"], item["abc"], item["xyz"], item["matrix"],
+            item["quantity"], item["revenue"], item["share"],
+            item["variation"] if item["variation"] is not None else "",
+        ])
+    payload = ("\ufeff" + output.getvalue()).encode("utf-8")
+    filename = f'bi_{analysis["date_from"]}_{analysis["date_to"]}.csv'
+    return StreamingResponse(
+        iter([payload]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/menu/item/{item_id}", response_class=HTMLResponse)
+def item_dashboard(
+    request: Request,
+    item_id: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ):
     result = None
     error = None
 
     try:
-        result = BIService().load(date_from, date_to)
+        result = ItemService().load(
+            item_id,
+            date_from,
+            date_to,
+        )
+        if result is None:
+            error = "Позиция меню не найдена."
     except SqlServerError as exc:
         error = str(exc)
 
     return templates.TemplateResponse(
         request=request,
-        name="bi_dashboard.html",
+        name="item_dashboard.html",
         context={
             "result": result,
             "error": error,
+            "item_id": item_id,
         },
     )
 
@@ -268,5 +313,5 @@ def bi_dashboard(
 def health():
     return {
         "status": "ok",
-        "version": "2.0.0",
+        "version": "4.1.0",
     }

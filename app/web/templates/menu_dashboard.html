@@ -103,7 +103,11 @@
             <div class="menu-card-head">
                 <div>
                     <div class="menu-group">{{ item.group_name }}</div>
-                    <h3>{{ item.item_name }}</h3>
+                    <h3>
+        <a class="item-link" href="/menu/item/{{ item.item_id }}?date_from={{ result.summary.date_from }}&date_to={{ result.summary.date_to }}">
+            {{ item.item_name }}
+        </a>
+    </h3>
                 </div>
                 {% if item.is_disabled %}
                 <span class="menu-status disabled">Отключено</span>

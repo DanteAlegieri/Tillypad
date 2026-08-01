@@ -7,8 +7,8 @@ from app.web.routes import router
 configure_logging()
 
 app = FastAPI(
-    title="Гастродом №3 — Tillypad Dashboard",
-    version="2.0.0",
+    title="TillyPad Restaurant OS",
+    version="4.1.0",
 )
 
 app.mount(

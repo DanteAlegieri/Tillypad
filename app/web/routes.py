@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -5,6 +7,8 @@ from fastapi.templating import Jinja2Templates
 from app.db.sql_server import SqlServer, SqlServerError
 from app.services.dashboard_service import DashboardService
 from app.services.explorer_service import ExplorerService
+from app.services.schema_map_service import SchemaMapService
+from app.services.sales_service import SalesService
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/web/templates")
@@ -125,9 +129,48 @@ def sql_explorer_table(
     )
 
 
+@router.get("/schema-map", response_class=HTMLResponse)
+def schema_map(request: Request, search: str = ""):
+    result = None
+    error = None
+    try:
+        result = SchemaMapService().load(search)
+    except SqlServerError as exc:
+        error = str(exc)
+    return templates.TemplateResponse(
+        request=request,
+        name="schema_map.html",
+        context={"result": result, "search": search, "error": error},
+    )
+
+
+@router.get("/sales", response_class=HTMLResponse)
+def sales_dashboard(
+    request: Request,
+    date_from: date | None = None,
+    date_to: date | None = None,
+):
+    result = None
+    error = None
+
+    try:
+        result = SalesService().dashboard(date_from, date_to)
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="sales_dashboard.html",
+        context={
+            "result": result,
+            "error": error,
+        },
+    )
+
+
 @router.get("/health")
 def health():
     return {
         "status": "ok",
-        "version": "1.0.0",
+        "version": "1.2.0",
     }

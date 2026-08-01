@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Продажи — Гастродом №3{% endblock %}
+{% block content %}
+<section class="hero">
+    <div>
+        <h1>Продажи</h1>
+        <p>
+            Первичная аналитика по заказам и позициям Tillypad.
+        </p>
+    </div>
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+<section class="panel">
+    <form method="get" class="period-form">
+        <div>
+            <label>Дата с</label>
+            <input
+                type="date"
+                name="date_from"
+                value="{{ result.summary.date_from if result else '' }}"
+            >
+        </div>
+        <div>
+            <label>Дата по</label>
+            <input
+                type="date"
+                name="date_to"
+                value="{{ result.summary.date_to if result else '' }}"
+            >
+        </div>
+        <div class="period-actions">
+            <button type="submit">Показать</button>
+            <a class="button-link secondary-link" href="/sales">
+                Сегодня
+            </a>
+        </div>
+    </form>
+</section>
+
+<div class="alert warning">
+    Сумма рассчитывается как
+    <span class="mono">orit_Count × orit_Price</span>.
+    Отменённые позиции, возвраты и служебные движения пока не исключаются:
+    для этого необходимо расшифровать
+    <span class="mono">orit_mvtp_ID</span> и статусы заказов.
+</div>
+
+{% if result %}
+<section class="cards sales-cards">
+    <article class="card">
+        <span>Выручка</span>
+        <strong>{{ "{:,.2f}".format(result.summary.revenue).replace(",", " ") }} ₽</strong>
+    </article>
+    <article class="card">
+        <span>Чеков</span>
+        <strong>{{ result.summary.checks_count }}</strong>
+    </article>
+    <article class="card">
+        <span>Средний чек</span>
+        <strong>{{ "{:,.2f}".format(result.summary.avg_check).replace(",", " ") }} ₽</strong>
+    </article>
+    <article class="card">
+        <span>Продано единиц</span>
+        <strong>{{ "{:,.0f}".format(result.summary.item_count).replace(",", " ") }}</strong>
+    </article>
+</section>
+
+<section class="grid two sales-grid">
+    <article class="panel">
+        <h2>Продажи по часам</h2>
+        {% if result.hourly %}
+        <div class="hourly-list">
+            {% for row in result.hourly %}
+            <div class="hour-row">
+                <div class="hour-label">
+                    {{ "%02d:00"|format(row.sale_hour) }}
+                </div>
+                <div class="hour-bar-track">
+                    <div
+                        class="hour-bar"
+                        style="width: {{ row.bar_percent }}%"
+                    ></div>
+                </div>
+                <div class="hour-value">
+                    {{ "{:,.0f}".format(row.revenue).replace(",", " ") }} ₽
+                </div>
+                <div class="hour-checks">
+                    {{ row.checks_count }} чек.
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">За выбранный период продаж нет.</p>
+        {% endif %}
+    </article>
+
+    <article class="panel">
+        <h2>ТОП блюд по выручке</h2>
+        {% if result.top_items %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Позиция</th>
+                        <th>Кол-во</th>
+                        <th>Чеков</th>
+                        <th>Выручка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in result.top_items %}
+                    <tr>
+                        <td>{{ row.item_name }}</td>
+                        <td>{{ "{:,.0f}".format(row.quantity).replace(",", " ") }}</td>
+                        <td>{{ row.checks_count }}</td>
+                        <td>
+                            {{ "{:,.0f}".format(row.revenue).replace(",", " ") }} ₽
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="muted">За выбранный период продаж нет.</p>
+        {% endif %}
+    </article>
+</section>
+
+<section class="panel">
+    <h2>Последние чеки периода</h2>
+    {% if result.recent_checks %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Счёт</th>
+                    <th>Первый заказ</th>
+                    <th>Последнее изменение</th>
+                    <th>Позиций</th>
+                    <th>Сумма</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in result.recent_checks %}
+                <tr>
+                    <td>{{ row.gest_Name or row.gest_ID }}</td>
+                    <td>{{ row.first_order_time }}</td>
+                    <td>{{ row.last_order_time }}</td>
+                    <td>{{ "{:,.0f}".format(row.item_count).replace(",", " ") }}</td>
+                    <td>
+                        {{ "{:,.2f}".format(row.check_sum).replace(",", " ") }} ₽
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="muted">За выбранный период чеков нет.</p>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

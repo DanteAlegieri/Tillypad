@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Карта базы — Гастродом №3{% endblock %}
+{% block content %}
+<section class="hero"><div><h1>Карта базы Tillypad</h1><p>Таблицы, ключевые колонки и зарегистрированные связи.</p></div></section>
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+<section class="panel">
+<form method="get">
+<label>Фильтр</label>
+<div class="search-row">
+<input name="search" value="{{ search }}" placeholder="Guest, Order, Menu, Pay, User">
+<button type="submit">Применить</button>
+<a class="button-link secondary-link" href="/schema-map">Сбросить</a>
+</div>
+</form>
+</section>
+{% if result %}
+<section class="cards map-cards">
+<article class="card"><span>Таблиц</span><strong>{{ result.summary.table_count }}</strong></article>
+<article class="card"><span>Колонок</span><strong>{{ result.summary.column_count }}</strong></article>
+<article class="card"><span>Внешних ключей</span><strong>{{ result.summary.foreign_key_count }}</strong></article>
+<article class="card"><span>Первичных ключей</span><strong>{{ result.summary.primary_key_count }}</strong></article>
+</section>
+<section class="panel">
+<h2>Таблицы</h2>
+{% if result.tables %}
+<div class="table-wrap"><table>
+<thead><tr><th>Схема</th><th>Таблица</th><th>Строк</th><th>Колонок</th><th></th></tr></thead>
+<tbody>
+{% for row in result.tables %}
+<tr><td>{{ row.schema_name }}</td><td class="mono">{{ row.table_name }}</td><td>{{ row.row_count }}</td><td>{{ row.column_count }}</td><td><a href="/sql-explorer/table?schema={{ row.schema_name }}&table={{ row.table_name }}">Открыть</a></td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}<p class="muted">Таблицы не найдены.</p>{% endif %}
+</section>
+<section class="panel">
+<h2>Внешние ключи</h2>
+{% if result.foreign_keys %}
+<div class="relation-list">
+{% for row in result.foreign_keys %}
+<article class="relation-card">
+<div><strong>{{ row.source_table }}</strong><br><span class="mono">{{ row.source_column }}</span></div>
+<div class="relation-arrow">→</div>
+<div><strong>{{ row.target_table }}</strong><br><span class="mono">{{ row.target_column }}</span></div>
+<div class="relation-name mono">{{ row.relation_name }}</div>
+</article>
+{% endfor %}
+</div>
+{% else %}<p class="muted">Внешние ключи не найдены. В Tillypad часть связей может существовать только по совпадающим GUID-полям.</p>{% endif %}
+</section>
+<section class="panel">
+<h2>Ключевые колонки</h2>
+{% if result.key_columns %}
+<div class="table-wrap"><table>
+<thead><tr><th>Таблица</th><th>Колонка</th><th>Тип</th><th>PK</th><th>Nullable</th></tr></thead>
+<tbody>
+{% for row in result.key_columns %}
+<tr><td class="mono">{{ row.schema_name }}.{{ row.table_name }}</td><td class="mono">{{ row.column_name }}</td><td>{{ row.data_type }}</td><td>{{ "Да" if row.is_primary_key else "Нет" }}</td><td>{{ row.is_nullable }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}<p class="muted">Ключевые колонки не найдены.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

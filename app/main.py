@@ -8,7 +8,7 @@ configure_logging()
 
 app = FastAPI(
     title="Гастродом №3 — Tillypad Dashboard",
-    version="1.0.0",
+    version="1.2.0",
 )
 
 app.mount(

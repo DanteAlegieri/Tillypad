@@ -111,14 +111,53 @@ class DeliveryService:
                 100 * timely / count, 1
             ) if count else 0
 
-            if row.get("avg_total_minutes") is not None:
-                row["avg_total_minutes"] = float(
-                    row["avg_total_minutes"]
-                )
-            if row.get("avg_road_minutes") is not None:
-                row["avg_road_minutes"] = float(
-                    row["avg_road_minutes"]
-                )
+            for key in (
+                "avg_total_minutes",
+                "best_total_minutes",
+                "worst_total_minutes",
+                "avg_road_minutes",
+            ):
+                if row.get(key) is not None:
+                    row[key] = float(row[key])
+
+        for row in result["heatmap"]:
+            if row.get("avg_minutes") is not None:
+                row["avg_minutes"] = float(row["avg_minutes"])
+
+        for row in result["longest_orders"]:
+            row["courier_name"] = self._clean_tilly_text(
+                row.get("courier_name")
+            )
+            row["method_name"] = self._clean_tilly_text(
+                row.get("method_name")
+            )
+
+            stage_values = {
+                "Ожидание кухни": float(
+                    row.get("wait_kitchen_minutes") or 0
+                ),
+                "Приготовление": float(
+                    row.get("cooking_minutes") or 0
+                ),
+                "Ожидание курьера": float(
+                    row.get("wait_courier_minutes") or 0
+                ),
+                "В пути": float(
+                    row.get("road_minutes") or 0
+                ),
+            }
+            for key in (
+                "wait_kitchen_minutes",
+                "cooking_minutes",
+                "wait_courier_minutes",
+                "road_minutes",
+            ):
+                row[key] = float(row.get(key) or 0)
+
+            row["bottleneck_name"], row["bottleneck_minutes"] = max(
+                stage_values.items(),
+                key=lambda item: item[1],
+            )
 
         # Значения AVG из SQL Server приходят как Decimal.
         # Перед передачей в JavaScript их нужно привести к float.
@@ -180,6 +219,15 @@ class DeliveryService:
             summary.get("total_orders"),
             previous_summary.get("total_orders"),
         )
+        previous_orders = int(previous_summary.get("total_orders") or 0)
+        summary["orders_delta_percent"] = (
+            round(
+                float(summary["orders_delta"]) / previous_orders * 100,
+                1,
+            )
+            if previous_orders and summary["orders_delta"] is not None
+            else None
+        )
 
         for row in result["couriers"]:
             score = float(row.get("on_time_percent") or 0)
@@ -203,7 +251,14 @@ class DeliveryService:
         result["date_to"] = date_to
         result["period_label"] = self._period_label(date_from, date_to)
         result["stage_cards"] = self._stage_cards(result["stages"])
+        result["process_flow"] = self._process_flow(result["stages"])
         result["daily_extremes"] = self._daily_extremes(result["daily"])
+        result["heatmap_matrix"] = self._heatmap_matrix(result["heatmap"])
+        result["insights"] = self._insights(
+            result,
+            previous_summary,
+        )
+        result["director_status"] = self._director_status(result)
         result["recommendation"] = self._recommendation(result)
         result["problems"] = self._problems(result)
         return result
@@ -328,6 +383,287 @@ class DeliveryService:
         }
 
     @staticmethod
+    def _human_date(value: Any) -> str:
+        if value is None:
+            return "Нет данных"
+
+        if isinstance(value, str):
+            parsed = date.fromisoformat(value)
+        else:
+            parsed = value
+
+        weekdays = (
+            "понедельник", "вторник", "среда", "четверг",
+            "пятница", "суббота", "воскресенье",
+        )
+        months = (
+            "января", "февраля", "марта", "апреля",
+            "мая", "июня", "июля", "августа",
+            "сентября", "октября", "ноября", "декабря",
+        )
+        return (
+            f"{parsed.day} {months[parsed.month - 1]} "
+            f"({weekdays[parsed.weekday()]})"
+        )
+
+    @staticmethod
+    def _process_flow(stages: dict[str, Any]) -> dict[str, Any]:
+        items = [
+            {
+                "title": "Ожидание кухни",
+                "value": float(
+                    stages.get("avg_wait_kitchen_minutes") or 0
+                ),
+                "class": "wait",
+            },
+            {
+                "title": "Приготовление",
+                "value": float(
+                    stages.get("avg_cooking_minutes") or 0
+                ),
+                "class": "cook",
+            },
+            {
+                "title": "Ожидание курьера",
+                "value": float(
+                    stages.get("avg_wait_courier_minutes") or 0
+                ),
+                "class": "courier",
+            },
+            {
+                "title": "В пути",
+                "value": float(
+                    stages.get("avg_road_minutes") or 0
+                ),
+                "class": "road",
+            },
+        ]
+        total = sum(item["value"] for item in items)
+
+        for item in items:
+            item["share"] = (
+                round(item["value"] / total * 100, 1)
+                if total else 0
+            )
+            item["width"] = max(item["share"], 2) if item["value"] else 0
+
+        return {
+            "items": items,
+            "total": round(total, 1),
+        }
+
+    @staticmethod
+    def _director_status(result: dict[str, Any]) -> dict[str, Any]:
+        summary = result["summary"]
+        stages = result["stages"]
+
+        on_time = float(summary.get("on_time_percent") or 0)
+        avg_total = float(summary.get("avg_total_minutes") or 0)
+        overdue = max(
+            int(summary.get("measured_orders") or 0)
+            - int(summary.get("on_time_orders") or 0),
+            0,
+        )
+
+        stage_values = {
+            "ожидание кухни": float(
+                stages.get("avg_wait_kitchen_minutes") or 0
+            ),
+            "приготовление": float(
+                stages.get("avg_cooking_minutes") or 0
+            ),
+            "ожидание курьера": float(
+                stages.get("avg_wait_courier_minutes") or 0
+            ),
+            "время в пути": float(
+                stages.get("avg_road_minutes") or 0
+            ),
+        }
+        worst_stage, worst_value = max(
+            stage_values.items(),
+            key=lambda item: item[1],
+        )
+
+        if on_time >= 85 and avg_total <= 40:
+            level = "good"
+            title = "Период проходит стабильно"
+        elif on_time >= 65 and avg_total <= 55:
+            level = "warning"
+            title = "Есть отклонения, но ситуация управляемая"
+        else:
+            level = "risk"
+            title = "Требуется вмешательство управляющего"
+
+        return {
+            "level": level,
+            "title": title,
+            "score": round(on_time, 1),
+            "bullets": [
+                f"Вовремя выполнено {on_time:.1f}% заказов.",
+                f"Среднее полное время — {avg_total:.1f} мин.",
+                f"Просрочено {overdue} заказов.",
+                (
+                    f"Главный узкий этап — {worst_stage}: "
+                    f"{worst_value:.1f} мин."
+                ),
+            ],
+        }
+
+    @staticmethod
+    def _heatmap_matrix(
+        rows: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        weekday_names = [
+            "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс",
+        ]
+        hours = list(range(10, 23))
+
+        lookup = {
+            (
+                int(row.get("weekday_number") or 0),
+                int(row.get("hour_number") or 0),
+            ): row
+            for row in rows
+        }
+
+        max_minutes = max(
+            (
+                float(row.get("avg_minutes") or 0)
+                for row in rows
+            ),
+            default=1,
+        )
+
+        matrix = []
+        for weekday_number, weekday_name in enumerate(weekday_names):
+            cells = []
+            for hour in hours:
+                row = lookup.get((weekday_number, hour), {})
+                avg_minutes = float(row.get("avg_minutes") or 0)
+                intensity = (
+                    round(avg_minutes / max_minutes * 100)
+                    if max_minutes
+                    else 0
+                )
+                cells.append(
+                    {
+                        "hour": hour,
+                        "orders": int(row.get("orders_count") or 0),
+                        "avg_minutes": avg_minutes,
+                        "overdue": int(row.get("overdue_orders") or 0),
+                        "intensity": intensity,
+                    }
+                )
+            matrix.append(
+                {
+                    "weekday": weekday_name,
+                    "cells": cells,
+                }
+            )
+
+        return {
+            "hours": hours,
+            "rows": matrix,
+        }
+
+    @staticmethod
+    def _insights(
+        result: dict[str, Any],
+        previous_summary: dict[str, Any],
+    ) -> list[dict[str, str]]:
+        summary = result["summary"]
+        stages = result["stages"]
+        insights: list[dict[str, str]] = []
+
+        orders_delta = summary.get("orders_delta")
+        if orders_delta is not None:
+            previous_orders = int(previous_summary.get("total_orders") or 0)
+            percent = (
+                round(float(orders_delta) / previous_orders * 100, 1)
+                if previous_orders
+                else 0
+            )
+            insights.append(
+                {
+                    "level": "good" if orders_delta >= 0 else "risk",
+                    "title": (
+                        "Заказов стало больше"
+                        if orders_delta >= 0
+                        else "Заказов стало меньше"
+                    ),
+                    "text": (
+                        f"{orders_delta:+.0f} заказов "
+                        f"({percent:+.1f}%) к предыдущему периоду."
+                    ),
+                }
+            )
+
+        on_time_delta = summary.get("on_time_delta")
+        if on_time_delta is not None:
+            insights.append(
+                {
+                    "level": "good" if on_time_delta >= 0 else "risk",
+                    "title": (
+                        "Своевременность улучшилась"
+                        if on_time_delta >= 0
+                        else "Своевременность снизилась"
+                    ),
+                    "text": (
+                        f"{on_time_delta:+.1f} п.п. "
+                        "к предыдущему периоду."
+                    ),
+                }
+            )
+
+        total_delta = summary.get("avg_total_delta")
+        if total_delta is not None:
+            insights.append(
+                {
+                    "level": "good" if total_delta <= 0 else "risk",
+                    "title": (
+                        "Среднее время сократилось"
+                        if total_delta <= 0
+                        else "Среднее время выросло"
+                    ),
+                    "text": (
+                        f"{total_delta:+.1f} мин "
+                        "к предыдущему периоду."
+                    ),
+                }
+            )
+
+        stage_values = {
+            "ожидание кухни": float(
+                stages.get("avg_wait_kitchen_minutes") or 0
+            ),
+            "приготовление": float(
+                stages.get("avg_cooking_minutes") or 0
+            ),
+            "ожидание курьера": float(
+                stages.get("avg_wait_courier_minutes") or 0
+            ),
+            "время в пути": float(
+                stages.get("avg_road_minutes") or 0
+            ),
+        }
+        worst_stage, worst_value = max(
+            stage_values.items(),
+            key=lambda item: item[1],
+        )
+        insights.append(
+            {
+                "level": "warning",
+                "title": "Главный узкий этап",
+                "text": (
+                    f"{worst_stage.capitalize()} — "
+                    f"{worst_value:.1f} мин."
+                ),
+            }
+        )
+
+        return insights[:4]
+
+    @staticmethod
     def _delta(current: Any, previous: Any) -> float | None:
         if current is None or previous is None:
             return None
@@ -352,7 +688,9 @@ class DeliveryService:
             {
                 "title": "Самый долгий день",
                 "value": (
-                    extremes["worst"]["sale_date"]
+                    DeliveryService._human_date(
+                        extremes["worst"]["sale_date"]
+                    )
                     if extremes["worst"]
                     else "Нет данных"
                 ),
@@ -365,7 +703,9 @@ class DeliveryService:
             {
                 "title": "Лучший день",
                 "value": (
-                    extremes["best"]["sale_date"]
+                    DeliveryService._human_date(
+                        extremes["best"]["sale_date"]
+                    )
                     if extremes["best"]
                     else "Нет данных"
                 ),
@@ -433,3 +773,148 @@ class DeliveryService:
                 f"Главный узкий этап — {worst_stage}: {worst_value:.1f} мин."
             ),
         }
+
+    def load_orders(
+        self,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        courier_name: str = "",
+        stage: str = "",
+        weekday_number: int | None = None,
+        hour_number: int | None = None,
+        only_overdue: bool = False,
+    ) -> dict[str, Any]:
+        today = date.today()
+        date_to = date_to or today
+        date_from = date_from or (date_to - timedelta(days=29))
+
+        if date_from > date_to:
+            date_from, date_to = date_to, date_from
+
+        rows = self.repository.load_orders(
+            date_from=date_from,
+            date_to=date_to,
+            courier_name=courier_name,
+            stage=stage,
+            weekday_number=weekday_number,
+            hour_number=hour_number,
+            only_overdue=only_overdue,
+        )
+
+        for row in rows:
+            row["courier_name"] = self._clean_tilly_text(
+                row.get("courier_name")
+            )
+            row["state_name"] = self._clean_tilly_text(
+                row.get("state_name")
+            )
+            row["method_name"] = self._clean_tilly_text(
+                row.get("method_name")
+            )
+
+            stage_values = {
+                "Ожидание кухни": float(
+                    row.get("wait_kitchen_minutes") or 0
+                ),
+                "Приготовление": float(
+                    row.get("cooking_minutes") or 0
+                ),
+                "Ожидание курьера": float(
+                    row.get("wait_courier_minutes") or 0
+                ),
+                "В пути": float(
+                    row.get("road_minutes") or 0
+                ),
+            }
+            for key in (
+                "wait_kitchen_minutes",
+                "cooking_minutes",
+                "wait_courier_minutes",
+                "road_minutes",
+            ):
+                row[key] = float(row.get(key) or 0)
+
+            row["bottleneck_name"], row["bottleneck_minutes"] = max(
+                stage_values.items(),
+                key=lambda item: item[1],
+            )
+
+        return {
+            "orders": rows,
+            "date_from": date_from,
+            "date_to": date_to,
+            "courier_name": courier_name,
+            "stage": stage,
+            "weekday_number": weekday_number,
+            "hour_number": hour_number,
+            "only_overdue": only_overdue,
+            "count": len(rows),
+        }
+
+    def load_order_detail(
+        self,
+        delivery_id: str,
+    ) -> dict[str, Any] | None:
+        order = self.repository.load_order_detail(delivery_id)
+        if order is None:
+            return None
+
+        for key in (
+            "courier_name",
+            "state_name",
+            "method_name",
+        ):
+            order[key] = self._clean_tilly_text(order.get(key))
+
+        for row in order["timeline"]:
+            row["state_name"] = self._clean_tilly_text(
+                row.get("state_name")
+            )
+            row["changed_by"] = self._clean_tilly_text(
+                row.get("changed_by")
+            )
+            row["stage_minutes"] = float(
+                row.get("stage_minutes") or 0
+            )
+
+        for item in order["items"]:
+            item["item_name"] = self._clean_tilly_text(
+                item.get("item_name")
+            )
+            item["item_sum"] = float(item.get("item_sum") or 0)
+
+        stage_labels = {
+            3: "Ожидание кухни",
+            5: "Приготовление",
+            6: "Ожидание курьера",
+            7: "В пути",
+        }
+        stage_totals = {
+            "Ожидание кухни": 0.0,
+            "Приготовление": 0.0,
+            "Ожидание курьера": 0.0,
+            "В пути": 0.0,
+        }
+
+        for row in order["timeline"]:
+            label = stage_labels.get(int(row.get("state_id") or -1))
+            if label:
+                stage_totals[label] += row["stage_minutes"]
+
+        order["stage_totals"] = [
+            {
+                "title": title,
+                "minutes": round(minutes, 1),
+            }
+            for title, minutes in stage_totals.items()
+        ]
+        order["bottleneck"] = max(
+            order["stage_totals"],
+            key=lambda item: item["minutes"],
+        )
+        order["items_total"] = round(
+            sum(float(item["item_sum"]) for item in order["items"]),
+            2,
+        )
+        return order
+

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Заказы доставки{% endblock %}
+
+{% block content %}
+<section class="page-heading delivery-detail-heading">
+    <div>
+        <div class="eyebrow">ДЕТАЛИЗАЦИЯ ДОСТАВКИ</div>
+        <h1>Заказы за период</h1>
+        <p>Переход от показателя к каждому конкретному заказу.</p>
+    </div>
+    <a class="secondary-button" href="/delivery">← Назад к аналитике</a>
+</section>
+
+{% if error %}
+<div class="error-card">{{ error }}</div>
+{% elif result %}
+<section class="panel">
+    <form class="delivery-orders-filter" method="get">
+        <label>
+            <span>С</span>
+            <input type="date" name="date_from" value="{{ result.date_from }}">
+        </label>
+        <label>
+            <span>По</span>
+            <input type="date" name="date_to" value="{{ result.date_to }}">
+        </label>
+        <label>
+            <span>Курьер</span>
+            <input type="text" name="courier" value="{{ result.courier_name }}" placeholder="Все курьеры">
+        </label>
+        <label>
+            <span>Этап</span>
+            <select name="stage">
+                <option value="">Все этапы</option>
+                <option value="wait_kitchen" {% if result.stage == "wait_kitchen" %}selected{% endif %}>Ожидание кухни</option>
+                <option value="cooking" {% if result.stage == "cooking" %}selected{% endif %}>Приготовление</option>
+                <option value="wait_courier" {% if result.stage == "wait_courier" %}selected{% endif %}>Ожидание курьера</option>
+                <option value="road" {% if result.stage == "road" %}selected{% endif %}>В пути</option>
+            </select>
+        </label>
+        <label class="filter-check">
+            <input type="checkbox" name="overdue" value="true" {% if result.only_overdue %}checked{% endif %}>
+            Только просроченные
+        </label>
+        <button type="submit">Показать</button>
+    </form>
+</section>
+
+<section class="orders-summary-row">
+    <article>
+        <span>Найдено заказов</span>
+        <strong>{{ result.count }}</strong>
+    </article>
+    {% if result.hour_number is not none %}
+    <article>
+        <span>Час</span>
+        <strong>{{ result.hour_number }}:00</strong>
+    </article>
+    {% endif %}
+    {% if result.weekday_number is not none %}
+    <article>
+        <span>День недели</span>
+        <strong>{{ ["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье"][result.weekday_number] }}</strong>
+    </article>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">СПИСОК ЗАКАЗОВ</div>
+            <h2>Результаты фильтра</h2>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="delivery-orders-table">
+            <thead>
+                <tr>
+                    <th>Заказ</th>
+                    <th>Дата</th>
+                    <th>Всего</th>
+                    <th>Статус</th>
+                    <th>Курьер</th>
+                    <th>Главная задержка</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in result.orders %}
+                <tr class="{% if order.is_overdue %}order-overdue{% endif %}">
+                    <td><strong>№{{ order.order_name }}</strong><small>{{ order.method_name }}</small></td>
+                    <td>{{ order.started_at.strftime("%d.%m.%Y %H:%M") }}</td>
+                    <td><strong>{{ order.total_minutes }} мин</strong></td>
+                    <td>{{ order.state_name }}</td>
+                    <td>{{ order.courier_name }}</td>
+                    <td>
+                        <span class="reason-badge">
+                            {{ order.bottleneck_name }} · {{ "%.1f"|format(order.bottleneck_minutes) }} мин
+                        </span>
+                    </td>
+                    <td>
+                        <a class="table-action" href="/delivery/order/{{ order.delivery_id }}">Открыть →</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7">По выбранным условиям заказов нет.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

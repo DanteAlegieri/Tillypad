@@ -393,6 +393,68 @@ def delivery_dashboard(
     )
 
 
+@router.get("/delivery/orders", response_class=HTMLResponse)
+def delivery_orders(
+    request: Request,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    courier: str = "",
+    stage: str = "",
+    weekday: int | None = None,
+    hour: int | None = None,
+    overdue: bool = False,
+):
+    result = None
+    error = None
+
+    try:
+        result = DeliveryService().load_orders(
+            date_from=date_from,
+            date_to=date_to,
+            courier_name=courier,
+            stage=stage,
+            weekday_number=weekday,
+            hour_number=hour,
+            only_overdue=overdue,
+        )
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="delivery_orders.html",
+        context={
+            "result": result,
+            "error": error,
+        },
+    )
+
+
+@router.get("/delivery/order/{delivery_id}", response_class=HTMLResponse)
+def delivery_order_detail(
+    request: Request,
+    delivery_id: str,
+):
+    result = None
+    error = None
+
+    try:
+        result = DeliveryService().load_order_detail(delivery_id)
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="delivery_order_detail.html",
+        context={
+            "result": result,
+            "error": error,
+            "delivery_id": delivery_id,
+        },
+        status_code=200 if result or error else 404,
+    )
+
+
 @router.get("/database-explorer", response_class=HTMLResponse)
 def database_explorer(request: Request, search: str = ""):
     result = None
@@ -434,5 +496,5 @@ def database_explorer_table(
 def health():
     return {
         "status": "ok",
-        "version": "8.0.1",
+        "version": "11.0.2",
     }

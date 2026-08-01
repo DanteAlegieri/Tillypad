@@ -59,12 +59,44 @@
 {% endif %}
 
 {% if result %}
-<section class="delivery-advice advice-{{ result.recommendation.level }}">
-    <div class="delivery-advice-mark">!</div>
-    <div>
-        <div class="eyebrow">ВЫВОД ЦИФРОВОГО УПРАВЛЯЮЩЕГО</div>
-        <h2>{{ result.recommendation.title }}</h2>
-        <p>{{ result.recommendation.text }}</p>
+<section class="director-status director-{{ result.director_status.level }}">
+    <div class="director-status-copy">
+        <div class="eyebrow">СТАТУС ДЛЯ РУКОВОДИТЕЛЯ</div>
+        <h2>{{ result.director_status.title }}</h2>
+        <div class="director-bullets">
+            {% for bullet in result.director_status.bullets %}
+            <div><span></span>{{ bullet }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div
+        class="director-gauge"
+        style="--score: {{ result.director_status.score }};"
+        aria-label="Вовремя выполнено {{ result.director_status.score }} процентов"
+    >
+        <div>
+            <strong>{{ result.director_status.score }}%</strong>
+            <span>вовремя</span>
+        </div>
+    </div>
+</section>
+
+<section class="delivery-insights">
+    <div class="delivery-insights-heading">
+        <div class="eyebrow">ЧТО ПРОИЗОШЛО ЗА ПЕРИОД</div>
+        <h2>Краткая управленческая сводка</h2>
+    </div>
+    <div class="delivery-insights-grid">
+        {% for insight in result.insights %}
+        <article class="insight-{{ insight.level }}">
+            <span></span>
+            <div>
+                <strong>{{ insight.title }}</strong>
+                <p>{{ insight.text }}</p>
+            </div>
+        </article>
+        {% endfor %}
     </div>
 </section>
 
@@ -75,7 +107,11 @@
         <small>за выбранный период</small>
         {% if result.summary.orders_delta is not none %}
         <em class="kpi-delta {% if result.summary.orders_delta >= 0 %}delta-up{% else %}delta-down{% endif %}">
-            {{ "%+.1f"|format(result.summary.orders_delta) }} к прошлому периоду
+            {% if result.summary.orders_delta >= 0 %}▲{% else %}▼{% endif %}
+            {{ "%+.0f"|format(result.summary.orders_delta) }} заказов
+            {% if result.summary.orders_delta_percent is not none %}
+                ({{ "%+.1f"|format(result.summary.orders_delta_percent) }}%)
+            {% endif %}
         </em>
         {% endif %}
     </article>
@@ -152,6 +188,30 @@
     {% endfor %}
 </section>
 
+<section class="panel process-flow-panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ГДЕ ТЕРЯЕТСЯ ВРЕМЯ</div>
+            <h2>Живая схема процесса</h2>
+        </div>
+        <strong>{{ result.process_flow.total }} мин всего</strong>
+    </div>
+
+    <div class="process-flow">
+        {% for item in result.process_flow["items"] %}
+        <div
+            class="process-segment process-{{ item.class }}"
+            style="width: {{ item.width }}%;"
+            title="{{ item.title }}: {{ '%.1f'|format(item.value) }} мин"
+        >
+            <span>{{ item.title }}</span>
+            <strong>{{ "%.1f"|format(item.value) }} мин</strong>
+            <small>{{ item.share }}%</small>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
 <section class="delivery-main-grid">
     <article class="panel">
         <div class="panel-title-row">
@@ -161,16 +221,15 @@
             </div>
         </div>
         <div class="delivery-chart-controls">
+            <div class="chart-view-buttons">
+                <button type="button" data-view="speed" class="active">Скорость</button>
+                <button type="button" data-view="performance">Выполнение</button>
+                <button type="button" data-view="orders">Заказы</button>
+            </div>
             <div class="chart-period-buttons">
                 <button type="button" data-group="day" class="active">По дням</button>
                 <button type="button" data-group="week">По неделям</button>
                 <button type="button" data-group="month">По месяцам</button>
-            </div>
-            <div class="chart-metric-toggles">
-                <label><input type="checkbox" data-dataset="0" checked> Заказы</label>
-                <label><input type="checkbox" data-dataset="1" checked> Среднее время</label>
-                <label><input type="checkbox" data-dataset="2" checked> Вовремя %</label>
-                <label><input type="checkbox" data-dataset="3" checked> Просроченные</label>
             </div>
         </div>
         <div class="delivery-chart"><canvas id="deliveryDailyChart"></canvas></div>
@@ -222,7 +281,9 @@
                 <tr>
                     <th>Курьер</th>
                     <th>Заказов</th>
-                    <th>Полное время</th>
+                    <th>Среднее</th>
+                    <th>Лучший</th>
+                    <th>Худший</th>
                     <th>В пути</th>
                     <th>Вовремя</th>
                     <th>Рейтинг</th>
@@ -231,9 +292,15 @@
             <tbody>
                 {% for courier in result.couriers %}
                 <tr>
-                    <td><strong>{{ courier.courier_name }}</strong></td>
+                    <td>
+        <a class="drill-link" href="/delivery/orders?date_from={{ result.date_from }}&date_to={{ result.date_to }}&courier={{ courier.courier_name | urlencode }}">
+            <strong>{{ courier.courier_name }}</strong>
+        </a>
+    </td>
                     <td>{{ courier.orders_count }}</td>
                     <td>{{ "%.1f"|format(courier.avg_total_minutes or 0) }} мин</td>
+                    <td>{{ "%.1f"|format(courier.best_total_minutes or 0) }} мин</td>
+                    <td>{{ "%.1f"|format(courier.worst_total_minutes or 0) }} мин</td>
                     <td>{{ "%.1f"|format(courier.avg_road_minutes or 0) }} мин</td>
                     <td>
                         <span class="delivery-rate {% if courier.on_time_percent >= 80 %}rate-good{% elif courier.on_time_percent >= 60 %}rate-warning{% else %}rate-risk{% endif %}">
@@ -243,7 +310,105 @@
                     <td><span class="delivery-rate {{ courier.rating_class }}">{{ courier.rating }}</span></td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6">За выбранный период данных нет.</td></tr>
+                <tr><td colspan="8">За выбранный период данных нет.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel delivery-heatmap-panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ПИКОВЫЕ ЧАСЫ</div>
+            <h2>Тепловая карта нагрузки</h2>
+        </div>
+        <small>Чем темнее ячейка, тем выше среднее время выполнения</small>
+    </div>
+
+    <div class="delivery-heatmap-wrap">
+        <table class="delivery-heatmap">
+            <thead>
+                <tr>
+                    <th>День</th>
+                    {% for hour in result.heatmap_matrix.hours %}
+                    <th>{{ hour }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in result.heatmap_matrix.rows %}
+                {% set weekday_index = loop.index0 %}
+                <tr>
+                    <th>{{ row.weekday }}</th>
+                    {% for cell in row.cells %}
+                    <td
+                        style="--heat: {{ cell.intensity }}%;"
+                        title="{{ cell.orders }} заказов · {{ '%.1f'|format(cell.avg_minutes) }} мин · {{ cell.overdue }} просрочено"
+                    >
+                        {% if cell.orders %}
+                        <a href="/delivery/orders?date_from={{ result.date_from }}&date_to={{ result.date_to }}&weekday={{ weekday_index }}&hour={{ cell.hour }}">
+                            <strong>{{ cell.orders }}</strong>
+                            <span>{{ "%.0f"|format(cell.avg_minutes) }}</span>
+                        </a>
+                        {% else %}
+                        <em>—</em>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">РАЗБОР ОТКЛОНЕНИЙ</div>
+            <h2>Самые долгие заказы</h2>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Всего</th>
+                    <th>Кухня</th>
+                    <th>Готовка</th>
+                    <th>Курьер</th>
+                    <th>В пути</th>
+                    <th>Главная причина</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in result.longest_orders %}
+                <tr>
+                    <td>
+                        {{ order.started_at.strftime('%d.%m.%Y %H:%M') }}
+                        <small>{{ order.method_name }} · {{ order.courier_name }}</small>
+                    </td>
+                    <td>
+        <a class="drill-link" href="/delivery/order/{{ order.delivery_id }}">
+            <strong>{{ order.total_minutes }} мин</strong>
+        </a>
+    </td>
+                    <td>{{ "%.1f"|format(order.wait_kitchen_minutes) }}</td>
+                    <td>{{ "%.1f"|format(order.cooking_minutes) }}</td>
+                    <td>{{ "%.1f"|format(order.wait_courier_minutes) }}</td>
+                    <td>{{ "%.1f"|format(order.road_minutes) }}</td>
+                    <td>
+                        <span class="reason-badge">
+                            {{ order.bottleneck_name }}
+                            · {{ "%.1f"|format(order.bottleneck_minutes) }} мин
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7">За выбранный период данных нет.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -254,7 +419,13 @@
     {% for item in result.problems %}
     <article>
         <span>{{ item.title }}</span>
+        {% if item.title == "Просроченных заказов" %}
+        <a class="drill-link" href="/delivery/orders?date_from={{ result.date_from }}&date_to={{ result.date_to }}&overdue=true">
+            <strong>{{ item.value }}</strong>
+        </a>
+    {% else %}
         <strong>{{ item.value }}</strong>
+    {% endif %}
         <small>{{ item.note }}</small>
     </article>
     {% endfor %}
@@ -456,15 +627,31 @@ document.querySelectorAll("[data-group]").forEach(button => {
     });
 });
 
-document.querySelectorAll("[data-dataset]").forEach(input => {
-    input.addEventListener("change", () => {
-        const index = Number(input.dataset.dataset);
-        deliveryChart.setDatasetVisibility(index, input.checked);
-        deliveryChart.update();
+const chartViews = {
+    speed: [true, true, false, false, true],
+    performance: [false, false, true, true, false],
+    orders: [true, true, false, false, false]
+};
+
+function applyChartView(view) {
+    chartViews[view].forEach((visible, index) => {
+        deliveryChart.setDatasetVisibility(index, visible);
+    });
+    deliveryChart.update();
+}
+
+document.querySelectorAll("[data-view]").forEach(button => {
+    button.addEventListener("click", () => {
+        document.querySelectorAll("[data-view]").forEach(item => {
+            item.classList.remove("active");
+        });
+        button.classList.add("active");
+        applyChartView(button.dataset.view);
     });
 });
 
 updateChart("day");
+applyChartView("speed");
 </script>
 {% endif %}
 {% endblock %}

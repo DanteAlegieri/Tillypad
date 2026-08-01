@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Карточка заказа{% endblock %}
+
+{% block content %}
+<section class="page-heading delivery-detail-heading">
+    <div>
+        <div class="eyebrow">КАРТОЧКА ЗАКАЗА</div>
+        <h1>
+            {% if result %}Заказ №{{ result.order_name }}{% else %}Заказ не найден{% endif %}
+        </h1>
+        {% if result %}
+        <p>{{ result.method_name }} · {{ result.started_at.strftime("%d.%m.%Y %H:%M") }}</p>
+        {% endif %}
+    </div>
+    <div class="heading-actions">
+        <a class="secondary-button" href="javascript:history.back()">← Назад</a>
+        <a class="secondary-button" href="/delivery">Аналитика доставки</a>
+    </div>
+</section>
+
+{% if error %}
+<div class="error-card">{{ error }}</div>
+{% elif not result %}
+<div class="error-card">Заказ с идентификатором {{ delivery_id }} не найден.</div>
+{% else %}
+<section class="order-detail-kpis">
+    <article>
+        <span>Полное время</span>
+        <strong>{{ result.total_minutes }} мин</strong>
+    </article>
+    <article>
+        <span>Текущий статус</span>
+        <strong>{{ result.state_name }}</strong>
+    </article>
+    <article>
+        <span>Курьер</span>
+        <strong>{{ result.courier_name }}</strong>
+    </article>
+    <article>
+        <span>Главная задержка</span>
+        <strong>{{ result.bottleneck.title }}</strong>
+        <small>{{ result.bottleneck.minutes }} мин</small>
+    </article>
+</section>
+
+<section class="order-detail-grid">
+    <article class="panel">
+        <div class="eyebrow">ПРОХОЖДЕНИЕ ЗАКАЗА</div>
+        <h2>Полный таймлайн</h2>
+
+        <div class="order-timeline">
+            {% for event in result.timeline %}
+            <div class="order-timeline-event">
+                <time>{{ event.state_date.strftime("%H:%M:%S") }}</time>
+                <span class="timeline-dot"></span>
+                <div>
+                    <strong>{{ event.state_name }}</strong>
+                    <p>
+                        {{ event.changed_by }}
+                        {% if event.stage_minutes %}
+                        · этап занял {{ "%.1f"|format(event.stage_minutes) }} мин
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            {% else %}
+            <p>История изменения статусов отсутствует.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="eyebrow">ГДЕ ПОТЕРЯНО ВРЕМЯ</div>
+        <h2>Разбивка по этапам</h2>
+
+        <div class="order-stage-list">
+            {% set max_stage = result.stage_totals | map(attribute="minutes") | max %}
+            {% for stage in result.stage_totals %}
+            <div>
+                <div><span>{{ stage.title }}</span><strong>{{ stage.minutes }} мин</strong></div>
+                <div class="order-stage-track">
+                    <span style="width: {{ (stage.minutes / max_stage * 100) if max_stage else 0 }}%"></span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="order-conclusion">
+            <span>Главная причина задержки</span>
+            <strong>{{ result.bottleneck.title }}</strong>
+            <p>{{ result.bottleneck.minutes }} мин из {{ result.total_minutes }} мин полного времени.</p>
+        </div>
+    </article>
+</section>
+
+<section class="order-detail-grid">
+    <article class="panel">
+        <div class="eyebrow">СОСТАВ ЗАКАЗА</div>
+        <h2>Позиции</h2>
+        <div class="order-items">
+            {% for item in result["items"] %}
+            <div>
+                <span>{{ item.item_name }} × {{ item.item_count }}</span>
+                <strong>{{ "%.0f"|format(item.item_sum) }} ₽</strong>
+            </div>
+            {% else %}
+            <p>Позиции заказа не найдены.</p>
+            {% endfor %}
+        </div>
+        <div class="order-total">
+            <span>Итого по позициям</span>
+            <strong>{{ "%.0f"|format(result.items_total) }} ₽</strong>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="eyebrow">ИНФОРМАЦИЯ</div>
+        <h2>Клиент и доставка</h2>
+        <dl class="order-info-list">
+            <div><dt>Клиент</dt><dd>{{ result.client_name or "Не указан" }}</dd></div>
+            <div><dt>Телефон</dt><dd>{{ result.client_phone or "Не указан" }}</dd></div>
+            <div><dt>Адрес</dt><dd>{{ result.client_address or "Не указан" }}</dd></div>
+            <div><dt>Открыт</dt><dd>{{ result.started_at.strftime("%d.%m.%Y %H:%M:%S") }}</dd></div>
+            <div><dt>Закрыт</dt><dd>{{ result.completed_at.strftime("%d.%m.%Y %H:%M:%S") if result.completed_at else "Не закрыт" }}</dd></div>
+            <div><dt>Комментарий курьера</dt><dd>{{ result.courier_comment or "Нет" }}</dd></div>
+        </dl>
+    </article>
+</section>
+{% endif %}
+{% endblock %}

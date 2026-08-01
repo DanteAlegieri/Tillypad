@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Центр решений — TillyPad Restaurant OS{% endblock %}
+{% block content %}
+
+<section class="page-heading">
+    <div>
+        <div class="eyebrow">DECISION ENGINE</div>
+        <h1>Центр решений</h1>
+        <p>Прогноз, состояние ресторана и конкретные действия на сегодня.</p>
+    </div>
+    {% if result %}
+    <div class="live-badge">
+        <span class="status-dot"></span>
+        Расчёт по SQL Server
+    </div>
+    {% endif %}
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+{% if result %}
+<section class="decision-hero status-{{ result.status }}">
+    <div>
+        <div class="eyebrow">СОСТОЯНИЕ РЕСТОРАНА</div>
+        <h2>{{ result.status_label }}</h2>
+        <p>
+            Система оценивает выполнение плана, темп выручки,
+            средний чек и состояние меню.
+        </p>
+    </div>
+    <div class="decision-score">
+        <strong>{{ result.restaurant_score }}</strong>
+        <span>из 100</span>
+    </div>
+</section>
+
+<section class="decision-kpi-grid">
+    <article class="decision-kpi primary">
+        <span>Прогноз к закрытию</span>
+        <strong>
+            {{ "{:,.0f}".format(result.forecast.forecast_revenue).replace(",", " ") }} ₽
+        </strong>
+        <small>
+            {{ result.forecast.method }}
+            · {{ result.forecast.historical_days }} аналогичных дней
+        </small>
+    </article>
+
+    <article class="decision-kpi">
+        <span>Вероятность выполнить план</span>
+        <strong>{{ result.forecast.probability }}%</strong>
+        <small>
+            План:
+            {{ "{:,.0f}".format(result.forecast.target).replace(",", " ") }} ₽
+        </small>
+    </article>
+
+    <article class="decision-kpi">
+        <span>Прогноз чеков</span>
+        <strong>{{ result.forecast.forecast_checks }}</strong>
+        <small>
+            Сейчас: {{ result.current.checks_count }}
+        </small>
+    </article>
+
+    <article class="decision-kpi">
+        <span>Здоровье меню</span>
+        <strong>{{ result.menu.score }}/100</strong>
+        <small>{{ result.menu.label }}</small>
+    </article>
+</section>
+
+<section class="decision-layout">
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">ПРОГНОЗ</div>
+                <h2>Факт и прогноз по часам</h2>
+            </div>
+        </div>
+        <div class="chart-wrap large">
+            <canvas id="decisionHourlyChart"></canvas>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">МЕНЮ</div>
+                <h2>Состояние ассортимента</h2>
+            </div>
+        </div>
+
+        <div class="menu-health-score health-{{ result.menu.status }}">
+            <strong>{{ result.menu.score }}</strong>
+            <span>{{ result.menu.label }}</span>
+        </div>
+
+        <div class="decision-facts">
+            <div>
+                <span>Позиций за 30 дней</span>
+                <strong>{{ result.menu.total_items }}</strong>
+            </div>
+            <div>
+                <span>Стабильных лидеров AX</span>
+                <strong>{{ result.menu.ax_count }}</strong>
+            </div>
+            <div>
+                <span>Нестабильных лидеров AZ</span>
+                <strong>{{ result.menu.az_count }}</strong>
+            </div>
+            <div>
+                <span>Слабых позиций</span>
+                <strong>{{ result.menu.weak_count }}</strong>
+            </div>
+            <div>
+                <span>Главный товар</span>
+                <strong>{{ result.menu.leader_name or "—" }}</strong>
+            </div>
+            <div>
+                <span>Доля лидера</span>
+                <strong>{{ result.menu.leader_share }}%</strong>
+            </div>
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">РЕКОМЕНДАЦИИ</div>
+            <h2>Что сделать сегодня</h2>
+        </div>
+    </div>
+
+    <div class="decision-alert-grid">
+        {% for alert in result.alerts %}
+        <article class="decision-alert insight-{{ alert.level }}">
+            <div class="decision-alert-number">{{ loop.index }}</div>
+            <div>
+                <h3>{{ alert.title }}</h3>
+                <p>{{ alert.text }}</p>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+{% if result.menu.weak_items %}
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">КАНДИДАТЫ НА РЕШЕНИЕ</div>
+            <h2>Слабые позиции меню</h2>
+        </div>
+        <a class="text-link" href="/bi">Открыть BI →</a>
+    </div>
+
+    <div class="weak-item-grid">
+        {% for item in result.menu.weak_items %}
+        <a
+            class="weak-item-card"
+            href="/menu/item/{{ item.item_id }}"
+        >
+            <strong>{{ item.item_name }}</strong>
+            <span>{{ item.quantity }} продаж</span>
+            <small>
+                {{ "{:,.0f}".format(item.revenue).replace(",", " ") }} ₽
+            </small>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+const hours = {{ result.forecast.hourly | map(attribute='sale_hour') | list | tojson }}.map(
+    hour => String(hour).padStart(2, '0') + ':00'
+);
+const revenue = {{ result.forecast.hourly | map(attribute='revenue') | list | tojson }};
+const checks = {{ result.forecast.hourly | map(attribute='checks_count') | list | tojson }};
+
+new Chart(document.getElementById('decisionHourlyChart'), {
+    data: {
+        labels: hours,
+        datasets: [{
+            type: 'bar',
+            label: 'Выручка',
+            data: revenue,
+            backgroundColor: '#a53124',
+            borderRadius: 9,
+            yAxisID: 'money'
+        }, {
+            type: 'line',
+            label: 'Чеки',
+            data: checks,
+            borderColor: '#6e625b',
+            backgroundColor: '#6e625b',
+            tension: .35,
+            pointRadius: 4,
+            yAxisID: 'checks'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        },
+        scales: {
+            x: {
+                grid: {
+                    display: false
+                }
+            },
+            money: {
+                beginAtZero: true,
+                position: 'left',
+                ticks: {
+                    callback: value =>
+                        new Intl.NumberFormat('ru-RU').format(value) + ' ₽'
+                }
+            },
+            checks: {
+                beginAtZero: true,
+                position: 'right',
+                ticks: {
+                    precision: 0
+                },
+                grid: {
+                    display: false
+                }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -21,6 +21,62 @@
 
 {% if result %}
 {% set info = result.overview %}
+{% set executive = result.executive %}
+
+<section class="system-status-card status-{{ executive.status }}">
+    <div>
+        <div class="eyebrow">RESTAURANT STATUS</div>
+        <h2>{{ executive.status_label }}</h2>
+        <p>
+            Прогноз к закрытию:
+            <strong>
+                {{ "{:,.0f}".format(executive.forecast.forecast_revenue).replace(",", " ") }} ₽
+            </strong>
+            · вероятность выполнения плана:
+            <strong>{{ executive.forecast.probability }}%</strong>
+        </p>
+    </div>
+    <div class="system-score">
+        <span>{{ executive.restaurant_score }}</span>
+        <small>из 100</small>
+    </div>
+</section>
+
+<section class="executive-mini-grid">
+    <article class="executive-mini-card">
+        <span>Прогноз к закрытию</span>
+        <strong>
+            {{ "{:,.0f}".format(executive.forecast.forecast_revenue).replace(",", " ") }} ₽
+        </strong>
+        <small>{{ executive.forecast.method }}</small>
+    </article>
+    <article class="executive-mini-card">
+        <span>Вероятность плана</span>
+        <strong>{{ executive.forecast.probability }}%</strong>
+        <small>
+            План:
+            {{ "{:,.0f}".format(executive.forecast.target).replace(",", " ") }} ₽
+        </small>
+    </article>
+    <article class="executive-mini-card">
+        <span>Здоровье меню</span>
+        <strong>{{ executive.menu.score }}/100</strong>
+        <small>{{ executive.menu.label }}</small>
+    </article>
+    <article class="executive-mini-card">
+        <span>Следующий пик</span>
+        <strong>
+            {% if executive.forecast.next_peak_hour is not none %}
+                {{ "%02d"|format(executive.forecast.next_peak_hour) }}:00
+            {% else %}
+                —
+            {% endif %}
+        </strong>
+        <small>
+            {{ "{:,.0f}".format(executive.forecast.next_peak_revenue).replace(",", " ") }} ₽ обычно
+        </small>
+    </article>
+</section>
 
 <section class="operations-kpi-grid">
     <article class="operations-kpi primary">
@@ -183,6 +239,25 @@
             </div>
         </div>
     </article>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">РЕШЕНИЯ НА СЕГОДНЯ</div>
+            <h2>Что требует внимания</h2>
+        </div>
+        <a class="text-link" href="/decisions">Открыть центр решений →</a>
+    </div>
+
+    <div class="insight-grid">
+        {% for alert in executive.alerts[:4] %}
+        <article class="insight-card insight-{{ alert.level }}">
+            <h3>{{ alert.title }}</h3>
+            <p>{{ alert.text }}</p>
+        </article>
+        {% endfor %}
+    </div>
 </section>
 
 <section class="panel">

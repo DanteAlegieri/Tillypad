@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}CEO Mode — TillyPad Restaurant OS{% endblock %}
+{% block content %}
+
+<section class="ceo-header">
+    <div>
+        <div class="eyebrow">CEO MODE</div>
+        <h1>{{ result.greeting if result else "Restaurant OS" }}, Андрей</h1>
+        <p>Главное о ресторане за несколько секунд.</p>
+    </div>
+    {% if result %}
+    <div class="live-badge">
+        <span class="status-dot"></span>
+        Данные SQL Server
+    </div>
+    {% endif %}
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+{% if result %}
+<section class="ceo-status status-{{ result.status }}">
+    <div>
+        <div class="eyebrow">RESTAURANT HEALTH</div>
+        <h2>{{ result.status_label }}</h2>
+        <p>
+            Прогноз к закрытию —
+            <strong>
+                {{ "{:,.0f}".format(result.forecast.forecast_revenue).replace(",", " ") }} ₽
+            </strong>
+        </p>
+    </div>
+    <div class="ceo-health-score">
+        <strong>{{ result.health }}</strong>
+        <span>из 100</span>
+    </div>
+</section>
+
+<section class="ceo-main-grid">
+    <article class="ceo-revenue-card">
+        <div class="eyebrow">СЕГОДНЯ</div>
+        <div class="ceo-revenue">
+            {{ "{:,.0f}".format(result.current.revenue).replace(",", " ") }} ₽
+        </div>
+        <div class="ceo-progress">
+            <span style="width: {{ result.progress }}%"></span>
+        </div>
+        <div class="ceo-revenue-meta">
+            <span>{{ result.progress }}% плана</span>
+            <span>
+                До плана:
+                {{ "{:,.0f}".format(result.remaining).replace(",", " ") }} ₽
+            </span>
+        </div>
+    </article>
+
+    <article class="ceo-action-card action-{{ result.main_action.level }}">
+        <div class="eyebrow">ГЛАВНОЕ СЕЙЧАС</div>
+        <h2>{{ result.main_action.title }}</h2>
+        <p>{{ result.main_action.text }}</p>
+        <strong>{{ result.main_action.effect }}</strong>
+    </article>
+</section>
+
+<section class="ceo-kpi-grid">
+    <article class="ceo-kpi">
+        <span>Прогноз к закрытию</span>
+        <strong>
+            {{ "{:,.0f}".format(result.forecast.forecast_revenue).replace(",", " ") }} ₽
+        </strong>
+        <small>{{ result.forecast.method }}</small>
+    </article>
+    <article class="ceo-kpi">
+        <span>Вероятность плана</span>
+        <strong>{{ result.forecast.probability }}%</strong>
+        <small>
+            План:
+            {{ "{:,.0f}".format(result.forecast.target).replace(",", " ") }} ₽
+        </small>
+    </article>
+    <article class="ceo-kpi">
+        <span>Средний чек</span>
+        <strong>
+            {{ "{:,.0f}".format(result.current.avg_check).replace(",", " ") }} ₽
+        </strong>
+        <small>{{ result.current.checks_count }} чек.</small>
+    </article>
+    <article class="ceo-kpi">
+        <span>Здоровье меню</span>
+        <strong>{{ result.menu.score }}/100</strong>
+        <small>{{ result.menu.label }}</small>
+    </article>
+</section>
+
+<section class="ceo-content-grid">
+    <article class="panel ceo-brain-panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">RESTAURANT BRAIN</div>
+                <h2>Что система видит сейчас</h2>
+            </div>
+        </div>
+
+        <div class="brain-feed">
+            {% for note in result.brain_notes %}
+            <article class="brain-note brain-{{ note.level }}">
+                <div class="brain-icon">◆</div>
+                <div>
+                    <h3>{{ note.title }}</h3>
+                    <p>{{ note.text }}</p>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel ceo-plan-panel">
+        <div class="eyebrow">ЧТО ДЕЛАТЬ СЕЙЧАС</div>
+        <h2>Короткий план действий</h2>
+
+        <div class="ceo-action-list">
+            <div>
+                <span>1</span>
+                <p>{{ result.main_action.text }}</p>
+            </div>
+
+            {% for alert in result.alerts[:3] %}
+            <div>
+                <span>{{ loop.index + 1 }}</span>
+                <p>{{ alert.text }}</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <a class="button-link ceo-button" href="/decisions">
+            Открыть центр решений
+        </a>
+    </article>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Исследователь TillyPad — Гастродом №3{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow">БАЗА ДАННЫХ TILLYPAD</div>
+    <h1>Исследователь TillyPad</h1>
+    <p>Просмотр таблиц, структуры, связей и примеров данных. Только чтение.</p>
+  </div>
+</section>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+{% if result %}
+<section class="panel">
+  <form class="explorer-search" method="get">
+    <input type="search" name="search" value="{{ result.search }}" placeholder="Check, Order, User, Menu, Stock">
+    <button type="submit">Найти</button>
+  </form>
+  <div class="explorer-summary">Найдено таблиц: <strong>{{ result.count }}</strong></div>
+</section>
+
+<section class="explorer-table-grid">
+{% for table in result.tables %}
+  <a class="explorer-table-card"
+     href="/database-explorer/table?schema_name={{ table.schema_name }}&table_name={{ table.table_name }}">
+    <div class="explorer-table-icon">Т</div>
+    <div>
+      <strong>{{ table.table_name }}</strong>
+      <span>{{ table.schema_name }}</span>
+    </div>
+    <small>{{ "{:,.0f}".format(table.rows_count or 0).replace(",", " ") }} строк</small>
+  </a>
+{% endfor %}
+</section>
+{% endif %}
+{% endblock %}

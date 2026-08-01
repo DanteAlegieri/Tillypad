@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 import csv
 import io
 
@@ -16,13 +16,37 @@ from app.services.finance_service import FinanceService
 from app.services.operations_service import OperationsService
 from app.services.bi_service import BIService
 from app.services.item_service import ItemService
+from app.services.decision_service import DecisionService
+from app.services.ceo_service import CEOService
+from app.services.database_explorer_service import DatabaseExplorerService
+from app.services.delivery_service import DeliveryService
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/web/templates")
 
 
 @router.get("/", response_class=HTMLResponse)
-def home(request: Request):
+def restaurant_brain_home(request: Request):
+    result = None
+    error = None
+
+    try:
+        result = CEOService().load()
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="restaurant_brain.html",
+        context={
+            "result": result,
+            "error": error,
+        },
+    )
+
+
+@router.get("/operations", response_class=HTMLResponse)
+def operations_dashboard(request: Request):
     result = None
     error = None
 
@@ -309,9 +333,106 @@ def item_dashboard(
     )
 
 
+@router.get("/decisions", response_class=HTMLResponse)
+def decision_center(request: Request):
+    result = None
+    error = None
+
+    try:
+        result = DecisionService().load()
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="decision_center.html",
+        context={
+            "result": result,
+            "error": error,
+        },
+    )
+
+
+@router.get("/ceo")
+def ceo_mode():
+    return RedirectResponse(url="/", status_code=302)
+
+
+
+
+
+@router.get("/delivery", response_class=HTMLResponse)
+def delivery_dashboard(
+    request: Request,
+    date_from: date | None = None,
+    date_to: date | None = None,
+):
+    result = None
+    error = None
+
+    try:
+        result = DeliveryService().load(date_from, date_to)
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="delivery_dashboard.html",
+        context={
+            "result": result,
+            "error": error,
+            "today": date.today(),
+            "yesterday": date.today() - timedelta(days=1),
+            "this_month_from": date.today().replace(day=1),
+            "this_month_to": date.today(),
+            "previous_month_to": date.today().replace(day=1) - timedelta(days=1),
+            "previous_month_from": (
+                date.today().replace(day=1) - timedelta(days=1)
+            ).replace(day=1),
+        },
+    )
+
+
+@router.get("/database-explorer", response_class=HTMLResponse)
+def database_explorer(request: Request, search: str = ""):
+    result = None
+    error = None
+    try:
+        result = DatabaseExplorerService().index(search)
+    except Exception as exc:
+        error = str(exc)
+    return templates.TemplateResponse(
+        request=request,
+        name="database_explorer.html",
+        context={"result": result, "error": error},
+    )
+
+
+@router.get("/database-explorer/table", response_class=HTMLResponse)
+def database_explorer_table(
+    request: Request,
+    schema_name: str,
+    table_name: str,
+    limit: int = 50,
+):
+    result = None
+    error = None
+    try:
+        result = DatabaseExplorerService().table(
+            schema_name, table_name, limit
+        )
+    except Exception as exc:
+        error = str(exc)
+    return templates.TemplateResponse(
+        request=request,
+        name="database_explorer_table.html",
+        context={"result": result, "error": error},
+    )
+
+
 @router.get("/health")
 def health():
     return {
         "status": "ok",
-        "version": "4.1.0",
+        "version": "8.0.1",
     }

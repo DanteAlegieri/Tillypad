@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Таблица TillyPad{% endblock %}
+{% block content %}
+<a class="text-link explorer-back" href="/database-explorer">← Все таблицы</a>
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+{% if result %}
+<section class="page-heading">
+  <div>
+    <div class="eyebrow">ТАБЛИЦА БАЗЫ ДАННЫХ</div>
+    <h1>{{ result.schema_name }}.{{ result.table_name }}</h1>
+    <p>Структура, внешние связи и предпросмотр данных.</p>
+  </div>
+</section>
+
+<section class="explorer-stats-grid">
+  <article><span>Колонок</span><strong>{{ result.structure|length }}</strong></article>
+  <article><span>Связей</span><strong>{{ result.relations|length }}</strong></article>
+  <article><span>Строк показано</span><strong>{{ result.preview.rows|length }}</strong></article>
+</section>
+
+<section class="panel">
+  <div class="eyebrow">СТРУКТУРА</div><h2>Колонки таблицы</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>№</th><th>Колонка</th><th>Тип</th><th>Размер</th><th>Nullable</th></tr></thead>
+      <tbody>
+      {% for c in result.structure %}
+        <tr>
+          <td>{{ c.column_id }}</td>
+          <td><code>{{ c.column_name }}</code></td>
+          <td>{{ c.data_type }}</td>
+          <td>{{ c.max_length }}</td>
+          <td>{{ "Да" if c.is_nullable else "Нет" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="eyebrow">СВЯЗИ</div><h2>Внешние ключи</h2>
+  {% if result.relations %}
+  <div class="relation-list">
+  {% for r in result.relations %}
+    <article class="relation-card">
+      <strong>{{ r.source_table }}.{{ r.source_column }}</strong>
+      <span>→</span>
+      <strong>{{ r.target_table }}.{{ r.target_column }}</strong>
+      <small>{{ r.foreign_key_name }}</small>
+    </article>
+  {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty-state">Внешние связи не найдены.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="panel-title-row">
+    <div><div class="eyebrow">ПРЕДПРОСМОТР</div><h2>Первые строки</h2></div>
+    <div class="explorer-limit-links">
+      <a href="?schema_name={{ result.schema_name }}&table_name={{ result.table_name }}&limit=20">20</a>
+      <a href="?schema_name={{ result.schema_name }}&table_name={{ result.table_name }}&limit=50">50</a>
+      <a href="?schema_name={{ result.schema_name }}&table_name={{ result.table_name }}&limit=100">100</a>
+    </div>
+  </div>
+  <div class="table-wrap explorer-preview">
+    <table>
+      <thead><tr>{% for c in result.preview.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for row in result.preview.rows %}
+        <tr>
+        {% for c in result.preview.columns %}
+          <td>
+          {% set value = row[c] %}
+          {% if value is none %}<span class="null-value">NULL</span>
+          {% elif value|string|length > 100 %}{{ (value|string)[:100] }}…
+          {% else %}{{ value }}
+          {% endif %}
+          </td>
+        {% endfor %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

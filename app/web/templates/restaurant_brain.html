@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Цифровой управляющий — TillyPad Restaurant OS{% endblock %}
+{% block content %}
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+{% if result %}
+<section class="brain-home">
+    <header class="brain-welcome">
+        <div>
+            <div class="eyebrow">ЦИФРОВОЙ УПРАВЛЯЮЩИЙ</div>
+            <h1>{{ result.greeting }}, Андрей</h1>
+            <p>{{ result.brain_report.headline }}</p>
+        </div>
+        <div class="brain-thinking">
+            <span class="brain-thinking-dot"></span>
+            <div>
+                <strong>Управляющий анализирует</strong>
+                <small>{{ result.brain_report.thought }}</small>
+            </div>
+        </div>
+    </header>
+
+    <section class="brain-command-card action-{{ result.main_action.level }}">
+        <div class="brain-command-copy">
+            <div class="eyebrow">ЧТО ДЕЛАТЬ ПРЯМО СЕЙЧАС</div>
+            <h2>{{ result.brain_report.decision.title }}</h2>
+            <p>{{ result.brain_report.decision.action }}</p>
+            <div class="brain-command-effect">{{ result.brain_report.decision.expected_effect }}</div>
+        </div>
+
+        <div class="brain-command-health">
+            <span>ИНДЕКС РЕСТОРАНА</span>
+            <strong>{{ result.brain_report.pulse_score }}</strong>
+            <small>{{ result.brain_report.pulse_label }} · {{ result.brain_report.pulse_trend }}</small>
+        </div>
+    </section>
+
+    
+<section class="pulse-organs-card">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ИНДЕКС РЕСТОРАНА</div>
+            <h2>Из чего складывается состояние</h2>
+        </div>
+        <div class="pulse-summary">
+            <strong>{{ result.brain_report.pulse_score }}/100</strong>
+            <span>{{ result.brain_report.pulse_label }}</span>
+        </div>
+    </div>
+
+    <div class="pulse-organs-grid">
+        {% for item in result.brain_report.pulse_components %}
+        <div class="pulse-organ">
+            <div class="pulse-organ-head">
+                <strong>{{ item.name }}</strong>
+                <span class="pulse-arrow pulse-{{ item.trend }}">
+                    {{ "↑" if item.trend == "up" else "↓" }}
+                </span>
+            </div>
+            <div class="pulse-organ-track">
+                <span style="width: {{ item.score }}%"></span>
+            </div>
+            <small>{{ item.score }}/100</small>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="brain-summary-strip">
+        <article>
+            <span>Выручка сегодня</span>
+            <strong>{{ "{:,.0f}".format(result.current.revenue).replace(",", " ") }} ₽</strong>
+            <small>{{ result.progress }}% плана</small>
+        </article>
+        <article>
+            <span>До плана</span>
+            <strong>{{ "{:,.0f}".format(result.remaining).replace(",", " ") }} ₽</strong>
+            <small>Цель: {{ "{:,.0f}".format(result.forecast.target).replace(",", " ") }} ₽</small>
+        </article>
+        <article>
+            <span>Прогноз к закрытию</span>
+            <strong>{{ "{:,.0f}".format(result.forecast.forecast_revenue).replace(",", " ") }} ₽</strong>
+            <small>{{ result.forecast.probability }}% вероятность плана</small>
+        </article>
+        <article>
+            <span>Средний чек</span>
+            <strong>{{ "{:,.0f}".format(result.current.avg_check).replace(",", " ") }} ₽</strong>
+            <small>{{ result.current.checks_count }} чек.</small>
+        </article>
+    </section>
+
+    <section class="brain-home-grid">
+        <article class="brain-now-card">
+            <div class="eyebrow">ЧТО ЗАМЕТИЛ УПРАВЛЯЮЩИЙ</div>
+            <h2>Что происходит сейчас</h2>
+
+            <div class="brain-signal-list">
+                {% for note in result.brain_notes %}
+                <div class="brain-signal brain-{{ note.level }}">
+                    <div class="brain-signal-marker"></div>
+                    <div>
+                        <strong>{{ note.title }}</strong>
+                        <p>{{ note.text }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="brain-actions-card">
+            <div class="eyebrow">КОРОТКИЙ ПЛАН</div>
+            <h2>Следующие действия</h2>
+
+            <ol class="brain-action-steps">
+                <li>{{ result.brain_report.decision.action }}</li>
+                {% for alert in result.alerts[:3] %}
+                <li>{{ alert.text }}</li>
+                {% endfor %}
+            </ol>
+
+            <div class="brain-actions-buttons">
+                <a class="button-link" href="/decisions">Центр решений</a>
+                <a class="button-link secondary-link" href="/operations">Операционный центр</a>
+            </div>
+        </article>
+    </section>
+
+    
+<section class="brain-explain-grid">
+    <article class="brain-explain-card">
+        <div class="panel-title-row">
+            <div><div class="eyebrow">ПОЧЕМУ Я ТАК РЕШИЛ</div><h2>Почему принято это решение</h2></div>
+            <div class="confidence-badge">{{ result.brain_report.decision.confidence }}%<span>уверенность</span></div>
+        </div>
+        <div class="reason-list">
+            {% for reason in result.brain_report.decision.reasons %}
+            <div class="reason-row reason-{{ reason.impact }}">
+                <div><strong>{{ reason.title }}</strong><span>{{ reason.value }}</span></div>
+                <small>+{{ reason.score }}</small>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="brain-changes-card">
+        <div class="eyebrow">ЧТО ИЗМЕНИЛОСЬ</div>
+        <h2>Что изменилось сегодня</h2>
+
+        <div class="change-list human-change-list">
+            {% for change in result.brain_report.changes %}
+            <div class="change-row change-{{ change.direction }}">
+                <span>{{ "↑" if change.direction == "up" else "↓" }}</span>
+                <div>
+                    <strong>{{ change.name }}</strong>
+                    {% if change.name == "Выручка" %}
+                        <small>{{ change.value }}% к аналогичному времени вчера</small>
+                    {% elif change.name == "Средний чек" %}
+                        <small>
+                            Сейчас {{ "{:,.0f}".format(result.current.avg_check).replace(",", " ") }} ₽,
+                            изменение {{ change.value }}%
+                        </small>
+                    {% elif change.name == "Меню" %}
+                        <small>Здоровье меню: {{ change.value }}/100</small>
+                    {% elif change.name == "Вероятность плана" %}
+                        <small>{{ change.value }}% вероятность выполнить цель</small>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="brain-timeline-card">
+    <div class="eyebrow">ХРОНОЛОГИЯ ДНЯ</div><h2>Что происходило сегодня</h2>
+    <div class="timeline-list">
+        {% for event in result.brain_report.timeline %}
+        <div class="timeline-event timeline-{{ event.level }}">
+            <time>{{ event.time }}</time><div class="timeline-dot"></div>
+            <div><strong>{{ event.title }}</strong><p>{{ event.text }}</p></div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+
+<section class="manager-conclusion">
+    <div class="manager-conclusion-icon">У</div>
+    <div>
+        <div class="eyebrow">ЗАКЛЮЧЕНИЕ ЦИФРОВОГО УПРАВЛЯЮЩЕГО</div>
+        <h2>{{ result.brain_report.headline }}</h2>
+        <p>
+            {{ result.brain_report.thought }}
+            Главная задача смены сейчас —
+            {{ result.brain_report.decision.action|lower }}
+        </p>
+        <div class="manager-conclusion-meta">
+            <span>
+                Уверенность:
+                <strong>{{ result.brain_report.decision.confidence }}%</strong>
+            </span>
+            <span>
+                Ожидаемый результат:
+                <strong>{{ result.brain_report.decision.expected_effect }}</strong>
+            </span>
+        </div>
+    </div>
+</section>
+
+<section class="brain-progress-card">
+        <div class="brain-progress-header">
+            <div>
+                <div class="eyebrow">ПЛАН НА ДЕНЬ</div>
+                <h2>
+                    {% if result.remaining <= 0 %}
+                        План выполнен
+                    {% else %}
+                        Осталось {{ "{:,.0f}".format(result.remaining).replace(",", " ") }} ₽
+                    {% endif %}
+                </h2>
+            </div>
+            <strong>{{ result.progress }}%</strong>
+        </div>
+
+        <div class="brain-progress-track">
+            <span style="width: {{ result.progress }}%"></span>
+        </div>
+
+        <div class="brain-progress-footer">
+            <span>Факт: {{ "{:,.0f}".format(result.current.revenue).replace(",", " ") }} ₽</span>
+            <span>Прогноз: {{ "{:,.0f}".format(result.forecast.forecast_revenue).replace(",", " ") }} ₽</span>
+            <span>План: {{ "{:,.0f}".format(result.forecast.target).replace(",", " ") }} ₽</span>
+        </div>
+    </section>
+</section>
+{% endif %}
+{% endblock %}

@@ -9,9 +9,7 @@ if not exist "%PYTHON_EXE%" (
     exit /b 1
 )
 
-"%PYTHON_EXE%" -m pip install --upgrade pip
 "%PYTHON_EXE%" -m pip install -r requirements.txt
-
 echo.
 echo Зависимости установлены.
 pause

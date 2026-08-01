@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Исследователь API{% endblock %}
+{% block content %}
+
+<section class="hero">
+    <div>
+        <h1>Исследователь API Tillypad</h1>
+        <p>
+            Проверяет GET Target, показывает тип ответа, число записей,
+            время выполнения и фрагмент JSON.
+        </p>
+    </div>
+</section>
+
+{% if message %}
+    <div class="alert success">{{ message }}</div>
+{% endif %}
+{% if error %}
+    <div class="alert error">{{ error }}</div>
+{% endif %}
+
+<section class="grid two">
+    <article class="panel">
+        <h2>Проверить один Target</h2>
+
+        <form method="post" action="/api-explorer/probe">
+            <label>Target</label>
+            <input
+                name="target"
+                list="known-targets"
+                placeholder="SegmentInfo"
+                required
+            >
+            <datalist id="known-targets">
+                {% for target in safe_targets %}
+                    <option value="{{ target }}"></option>
+                {% endfor %}
+            </datalist>
+
+            <label>JSON-фильтр</label>
+            <textarea
+                name="body"
+                rows="7"
+                placeholder='[{"gest_ID":"GUID"}]'
+            ></textarea>
+
+            <label>Тайм-аут, секунд</label>
+            <input
+                name="timeout"
+                type="number"
+                min="3"
+                max="120"
+                value="15"
+            >
+
+            <button type="submit">Проверить Target</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <h2>Проверить известные Target</h2>
+        <p class="muted">
+            Выполняются только GET-запросы. Target Guests автоматически
+            пропускается, потому что запрос без фильтра уже давал timeout.
+        </p>
+
+        <form method="post" action="/api-explorer/probe-known">
+            <label>Тайм-аут на один запрос, секунд</label>
+            <input
+                name="timeout"
+                type="number"
+                min="3"
+                max="60"
+                value="10"
+            >
+            <button type="submit">Запустить безопасную проверку</button>
+        </form>
+
+        <form method="post" action="/api-explorer/clear">
+            <button type="submit" class="secondary">
+                Очистить историю
+            </button>
+        </form>
+    </article>
+</section>
+
+<section class="panel">
+    <h2>Результаты</h2>
+
+    {% if probes %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>Target</th>
+                        <th>Статус</th>
+                        <th>HTTP</th>
+                        <th>мс</th>
+                        <th>Строк</th>
+                        <th>Тип</th>
+                        <th>Ответ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for probe in probes %}
+                    <tr>
+                        <td>{{ probe.created_at }}</td>
+                        <td class="mono">{{ probe.target }}</td>
+                        <td>
+                            <span class="status status-{{ probe.status }}">
+                                {{ probe.status }}
+                            </span>
+                        </td>
+                        <td>{{ probe.http_status or "—" }}</td>
+                        <td>{{ probe.duration_ms or "—" }}</td>
+                        <td>{{ probe.rows_count }}</td>
+                        <td>{{ probe.response_type or "—" }}</td>
+                        <td>
+                            {% if probe.response_preview %}
+                                <details>
+                                    <summary>Показать JSON</summary>
+                                    <pre>{{ probe.response_preview }}</pre>
+                                </details>
+                            {% elif probe.error_text %}
+                                <details>
+                                    <summary>Показать сообщение</summary>
+                                    <pre>{{ probe.error_text }}</pre>
+                                </details>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="muted">Проверки ещё не выполнялись.</p>
+    {% endif %}
+</section>
+
+{% endblock %}

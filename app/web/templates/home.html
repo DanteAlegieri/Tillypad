@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Главная — Гастродом №3{% endblock %}
+{% block content %}
+<section class="hero">
+    <div>
+        <h1>Tillypad Dashboard</h1>
+        <p>
+            Аналитика «Гастродома №3» на основе прямого чтения SQL Server.
+        </p>
+    </div>
+</section>
+
+<section class="grid two">
+    <article class="panel">
+        <h2>SQL-дашборд</h2>
+        <p>
+            Количество счетов за сегодня, статусы и последние гостевые счета.
+        </p>
+        <a class="button-link" href="/sql">Открыть дашборд</a>
+    </article>
+
+    <article class="panel">
+        <h2>SQL Explorer</h2>
+        <p>
+            Поиск таблиц и колонок, просмотр структуры и первых строк.
+        </p>
+        <a class="button-link" href="/sql-explorer">Открыть Explorer</a>
+    </article>
+</section>
+{% endblock %}

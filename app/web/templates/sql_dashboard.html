@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}SQL-дашборд — Гастродом №3{% endblock %}
+{% block content %}
+<section class="hero">
+    <div>
+        <h1>SQL-дашборд Tillypad</h1>
+        <p>
+            Прямое чтение базы через Radmin VPN. Только SELECT-запросы.
+        </p>
+    </div>
+</section>
+
+{% if error %}
+<div class="alert error">
+    <strong>Подключение не выполнено.</strong><br>
+    {{ error }}
+</div>
+{% endif %}
+
+{% if data %}
+<section class="panel">
+    <div class="sql-info">
+        <div>
+            <span>SQL Server</span>
+            <strong>{{ data.info.server_name }}</strong>
+        </div>
+        <div>
+            <span>База</span>
+            <strong>{{ data.info.database_name }}</strong>
+        </div>
+        <div>
+            <span>Статус</span>
+            <strong class="ok-text">Подключено</strong>
+        </div>
+    </div>
+</section>
+
+<section class="cards">
+    <article class="card">
+        <span>Сумма заказов сегодня</span>
+        <strong>{{ "%.2f"|format(data.stats.order_sum) }} ₽</strong>
+    </article>
+    <article class="card">
+        <span>Оплачено сегодня</span>
+        <strong>{{ "%.2f"|format(data.stats.pay_sum) }} ₽</strong>
+    </article>
+    <article class="card">
+        <span>Счетов сегодня</span>
+        <strong>{{ data.stats.checks_count }}</strong>
+    </article>
+    <article class="card">
+        <span>Средний чек</span>
+        <strong>{{ "%.2f"|format(data.stats.avg_check) }} ₽</strong>
+    </article>
+    <article class="card">
+        <span>Открытых</span>
+        <strong>{{ data.stats.open_count }}</strong>
+    </article>
+    <article class="card">
+        <span>Закрытых</span>
+        <strong>{{ data.stats.closed_count }}</strong>
+    </article>
+</section>
+
+<section class="panel">
+    <h2>Последние гостевые счета</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Счёт</th>
+                    <th>Открыт</th>
+                    <th>Закрыт</th>
+                    <th>Статус</th>
+                    <th>Сотрудник ID</th>
+                    <th>Подразделение ID</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in data.recent %}
+                <tr>
+                    <td>{{ row.gest_Name or row.gest_ID }}</td>
+                    <td>{{ row.gest_DateOpen or "—" }}</td>
+                    <td>{{ row.gest_DateClose or "—" }}</td>
+                    <td>{{ row.gest_gsst_ID }}</td>
+                    <td class="mono">{{ row.gest_usr_ID or "—" }}</td>
+                    <td class="mono">{{ row.gest_dvsn_ID or "—" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

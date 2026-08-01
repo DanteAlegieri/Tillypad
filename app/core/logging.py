@@ -8,13 +8,7 @@ def configure_logging() -> None:
     Path("logs").mkdir(exist_ok=True)
 
     logger.remove()
-    logger.add(
-        sys.stderr,
-        level="INFO",
-        enqueue=True,
-        backtrace=False,
-        diagnose=False,
-    )
+    logger.add(sys.stderr, level="INFO", enqueue=True)
     logger.add(
         "logs/app.log",
         rotation="5 MB",

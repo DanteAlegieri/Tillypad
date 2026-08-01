@@ -1,56 +1,68 @@
-# Tillypad Dashboard — Гастродом №3
+# Tillypad Dashboard v1.0
 
-Версия `0.2.0`.
+Первая стабильная архитектурная версия проекта для «Гастродома №3».
 
-## Что изменилось
+## Возможности
 
-- SQLAlchemy 2.0 вместо прямой работы с `sqlite3`;
-- настройки через `pydantic-settings`;
-- отдельный клиент Tillypad API;
-- отдельный сервис синхронизации;
-- отдельный слой запросов для дашборда;
-- логирование в `logs/app.log`;
-- сохранена работа с текущей SQLite-базой;
-- сохранён текущий интерфейс.
+- прямое подключение к SQL Server Tillypad через Radmin VPN;
+- SQL-дашборд по таблице `dbo.tp_Guests`;
+- SQL Explorer:
+  - поиск таблиц;
+  - количество строк;
+  - поиск колонок;
+  - структура таблицы;
+  - безопасный `SELECT TOP`;
+- логирование;
+- настройки через `.env`;
+- разделение кода на:
+  - подключение к БД;
+  - репозитории;
+  - сервисы;
+  - веб-маршруты;
+  - шаблоны.
 
-## Структура
+Все SQL-запросы используют только `SELECT`.
+
+## Установка
+
+1. Сохраните старый файл `.env`.
+2. Распакуйте архив в:
 
 ```text
-app/
-├── core/          настройки и логирование
-├── db/            подключение к базе
-├── models/        SQLAlchemy-модели
-├── repositories/  запросы к базе
-├── services/      Tillypad API и синхронизация
-└── web/           маршруты, шаблоны и стили
+C:\TillypadDashboard
 ```
 
-## Обновление текущей установки
+3. Скопируйте `.env.example` в `.env`.
+4. Заполните:
 
-1. Остановить сервер: `Ctrl+C`.
-2. Сделать резервную копию:
-   - `.env`
-   - `data/tillypad.db`
-3. Заменить файлы проекта содержимым этого архива.
-4. Вернуть `.env` и `data/tillypad.db`.
-5. Запустить `install.bat`.
-6. Запустить `run.bat`.
+```env
+TILLYPAD_SQL_SERVER=26.187.75.193
+TILLYPAD_SQL_PORT=1433
+TILLYPAD_SQL_DATABASE=TillypadSegment
+TILLYPAD_SQL_USER=ваш_sql_логин
+TILLYPAD_SQL_PASSWORD=ваш_sql_пароль
+TILLYPAD_SQL_DRIVER=ODBC Driver 18 for SQL Server
+TILLYPAD_SQL_ENCRYPT=no
+TILLYPAD_SQL_TRUST_CERTIFICATE=yes
+TILLYPAD_SQL_TIMEOUT=10
+```
+
+5. Запустите `install.bat`.
+6. Запустите `run.bat`.
+
+## Адреса
+
+```text
+http://127.0.0.1:8000/
+http://127.0.0.1:8000/sql
+http://127.0.0.1:8000/sql-explorer
+http://127.0.0.1:8000/sql-test
+```
 
 ## Git
 
-После проверки:
-
 ```cmd
 git add .
-git commit -m "Refactor project architecture to v0.2"
+git commit -m "Release stable architecture v1.0"
 git push
 ```
-
-## Ограничение API
-
-Документация Tillypad не содержит отдельного Target для полного кассового
-отчёта, строк чеков и детальных способов оплаты. В текущей версии используются
-данные `Guests`, `Divisions` и `SegmentInfo`.
-
-Для `Guests` желательно применять узкие фильтры, так как запрос без фильтра
-может завершаться по timeout.

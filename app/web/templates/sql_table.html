@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ schema }}.{{ table }} — SQL Explorer{% endblock %}
+{% block content %}
+<section class="hero">
+    <div>
+        <h1>{{ schema }}.{{ table }}</h1>
+        <p>Структура и безопасный предпросмотр данных.</p>
+    </div>
+    <a class="button-link" href="/sql-explorer">Назад к поиску</a>
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+<section class="panel">
+    <h2>Структура таблицы</h2>
+    {% if structure %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Колонка</th>
+                    <th>Тип</th>
+                    <th>Размер</th>
+                    <th>Nullable</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in structure %}
+                <tr>
+                    <td>{{ row.ordinal_position }}</td>
+                    <td class="mono">{{ row.column_name }}</td>
+                    <td>{{ row.data_type }}</td>
+                    <td>
+                        {% if row.max_length %}
+                            {{ row.max_length }}
+                        {% elif row.numeric_precision %}
+                            {{ row.numeric_precision }},{{ row.numeric_scale }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>{{ row.is_nullable }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <h2>Первые строки</h2>
+        <form
+            method="get"
+            action="/sql-explorer/table"
+            class="inline-form"
+        >
+            <input type="hidden" name="schema" value="{{ schema }}">
+            <input type="hidden" name="table" value="{{ table }}">
+            <input
+                type="number"
+                name="limit"
+                min="1"
+                max="100"
+                value="{{ limit }}"
+            >
+            <button type="submit">Обновить</button>
+        </form>
+    </div>
+
+    {% if preview and preview.rows %}
+    <div class="table-wrap preview-table">
+        <table>
+            <thead>
+                <tr>
+                {% for column in preview.columns %}
+                    <th>{{ column }}</th>
+                {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in preview.rows %}
+                <tr>
+                {% for value in row %}
+                    <td>
+                        {{ value if value is not none else "NULL" }}
+                    </td>
+                {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="muted">В таблице нет строк.</p>
+    {% endif %}
+</section>
+{% endblock %}

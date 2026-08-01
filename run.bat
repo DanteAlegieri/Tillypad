@@ -11,11 +11,11 @@ if not exist "%PYTHON_EXE%" (
 
 if not exist ".env" (
     echo Не найден файл .env
-    echo Скопируйте .env.example в .env и вставьте токен Tillypad.
+    echo Скопируйте .env.example в .env и заполните параметры SQL Server.
     pause
     exit /b 1
 )
 
-start "" http://127.0.0.1:8000
+start "" http://127.0.0.1:8000/sql
 "%PYTHON_EXE%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 pause

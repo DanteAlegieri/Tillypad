@@ -1,12 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Продажи — Гастродом №3{% endblock %}
 {% block content %}
-<section class="hero">
+<section class="page-heading">
     <div>
+        <div class="eyebrow">АНАЛИТИКА</div>
         <h1>Продажи</h1>
-        <p>
-            Первичная аналитика по заказам и позициям Tillypad.
-        </p>
+        <p>Выручка, чеки, динамика и популярные позиции.</p>
     </div>
 </section>
 
@@ -14,7 +13,7 @@
 <div class="alert error">{{ error }}</div>
 {% endif %}
 
-<section class="panel">
+<section class="panel filter-panel">
     <form method="get" class="period-form">
         <div>
             <label>Дата с</label>
@@ -34,109 +33,162 @@
         </div>
         <div class="period-actions">
             <button type="submit">Показать</button>
-            <a class="button-link secondary-link" href="/sales">
-                Сегодня
-            </a>
+            <a class="button-link secondary-link" href="/sales">Сегодня</a>
         </div>
     </form>
 </section>
 
 <div class="alert warning">
-    Сумма рассчитывается как
+    Предварительный расчёт:
     <span class="mono">orit_Count × orit_Price</span>.
-    Отменённые позиции, возвраты и служебные движения пока не исключаются:
-    для этого необходимо расшифровать
-    <span class="mono">orit_mvtp_ID</span> и статусы заказов.
+    Возвраты и служебные движения пока не исключены.
 </div>
 
 {% if result %}
-<section class="cards sales-cards">
-    <article class="card">
-        <span>Выручка</span>
-        <strong>{{ "{:,.2f}".format(result.summary.revenue).replace(",", " ") }} ₽</strong>
+<section class="kpi-grid">
+    {% set revenue_change = result.comparison.revenue_change %}
+    {% set checks_change = result.comparison.checks_change %}
+    {% set avg_change = result.comparison.avg_check_change %}
+    {% set units_change = result.comparison.item_count_change %}
+
+    <article class="kpi-card">
+        <div class="kpi-label">Выручка</div>
+        <div class="kpi-value">
+            {{ "{:,.2f}".format(result.summary.revenue).replace(",", " ") }} ₽
+        </div>
+        <div class="kpi-meta">
+            {% if revenue_change is not none %}
+                <span class="trend {{ 'up' if revenue_change >= 0 else 'down' }}">
+                    {{ "+" if revenue_change >= 0 else "" }}{{ revenue_change }}%
+                </span>
+            {% else %}
+                <span class="trend neutral">нет базы сравнения</span>
+            {% endif %}
+            <span>к прошлому периоду</span>
+        </div>
     </article>
-    <article class="card">
-        <span>Чеков</span>
-        <strong>{{ result.summary.checks_count }}</strong>
+
+    <article class="kpi-card">
+        <div class="kpi-label">Чеков</div>
+        <div class="kpi-value">{{ result.summary.checks_count }}</div>
+        <div class="kpi-meta">
+            {% if checks_change is not none %}
+                <span class="trend {{ 'up' if checks_change >= 0 else 'down' }}">
+                    {{ "+" if checks_change >= 0 else "" }}{{ checks_change }}%
+                </span>
+            {% else %}
+                <span class="trend neutral">нет базы сравнения</span>
+            {% endif %}
+            <span>к прошлому периоду</span>
+        </div>
     </article>
-    <article class="card">
-        <span>Средний чек</span>
-        <strong>{{ "{:,.2f}".format(result.summary.avg_check).replace(",", " ") }} ₽</strong>
+
+    <article class="kpi-card">
+        <div class="kpi-label">Средний чек</div>
+        <div class="kpi-value">
+            {{ "{:,.2f}".format(result.summary.avg_check).replace(",", " ") }} ₽
+        </div>
+        <div class="kpi-meta">
+            {% if avg_change is not none %}
+                <span class="trend {{ 'up' if avg_change >= 0 else 'down' }}">
+                    {{ "+" if avg_change >= 0 else "" }}{{ avg_change }}%
+                </span>
+            {% else %}
+                <span class="trend neutral">нет базы сравнения</span>
+            {% endif %}
+            <span>к прошлому периоду</span>
+        </div>
     </article>
-    <article class="card">
-        <span>Продано единиц</span>
-        <strong>{{ "{:,.0f}".format(result.summary.item_count).replace(",", " ") }}</strong>
+
+    <article class="kpi-card">
+        <div class="kpi-label">Продано единиц</div>
+        <div class="kpi-value">
+            {{ "{:,.0f}".format(result.summary.item_count).replace(",", " ") }}
+        </div>
+        <div class="kpi-meta">
+            {% if units_change is not none %}
+                <span class="trend {{ 'up' if units_change >= 0 else 'down' }}">
+                    {{ "+" if units_change >= 0 else "" }}{{ units_change }}%
+                </span>
+            {% else %}
+                <span class="trend neutral">нет базы сравнения</span>
+            {% endif %}
+            <span>к прошлому периоду</span>
+        </div>
     </article>
 </section>
 
-<section class="grid two sales-grid">
-    <article class="panel">
-        <h2>Продажи по часам</h2>
-        {% if result.hourly %}
-        <div class="hourly-list">
-            {% for row in result.hourly %}
-            <div class="hour-row">
-                <div class="hour-label">
-                    {{ "%02d:00"|format(row.sale_hour) }}
+<section class="analytics-grid">
+    <article class="panel chart-panel wide">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">ДИНАМИКА</div>
+                <h2>Выручка по дням</h2>
+            </div>
+            <div class="period-caption">
+                {{ result.summary.date_from }} — {{ result.summary.date_to }}
+            </div>
+        </div>
+        <div class="chart-wrap large">
+            <canvas id="dailyRevenueChart"></canvas>
+        </div>
+    </article>
+
+    <article class="panel chart-panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">НАГРУЗКА</div>
+                <h2>Продажи по часам</h2>
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="hourlyRevenueChart"></canvas>
+        </div>
+    </article>
+
+    <article class="panel top-panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">ЛИДЕРЫ</div>
+                <h2>ТОП блюд</h2>
+            </div>
+        </div>
+        {% if result.top_items %}
+        <div class="top-items-list">
+            {% for row in result.top_items[:10] %}
+            <div class="top-item">
+                <div class="top-rank">{{ loop.index }}</div>
+                <div class="top-item-name">
+                    <strong>{{ row.item_name }}</strong>
+                    <span>{{ "{:,.0f}".format(row.quantity).replace(",", " ") }} шт. · {{ row.checks_count }} чек.</span>
                 </div>
-                <div class="hour-bar-track">
-                    <div
-                        class="hour-bar"
-                        style="width: {{ row.bar_percent }}%"
-                    ></div>
-                </div>
-                <div class="hour-value">
+                <div class="top-item-value">
                     {{ "{:,.0f}".format(row.revenue).replace(",", " ") }} ₽
-                </div>
-                <div class="hour-checks">
-                    {{ row.checks_count }} чек.
                 </div>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p class="muted">За выбранный период продаж нет.</p>
-        {% endif %}
-    </article>
-
-    <article class="panel">
-        <h2>ТОП блюд по выручке</h2>
-        {% if result.top_items %}
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Позиция</th>
-                        <th>Кол-во</th>
-                        <th>Чеков</th>
-                        <th>Выручка</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for row in result.top_items %}
-                    <tr>
-                        <td>{{ row.item_name }}</td>
-                        <td>{{ "{:,.0f}".format(row.quantity).replace(",", " ") }}</td>
-                        <td>{{ row.checks_count }}</td>
-                        <td>
-                            {{ "{:,.0f}".format(row.revenue).replace(",", " ") }} ₽
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <p class="muted">За выбранный период продаж нет.</p>
+        <p class="muted">Нет продаж.</p>
         {% endif %}
     </article>
 </section>
 
 <section class="panel">
-    <h2>Последние чеки периода</h2>
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ОПЕРАЦИИ</div>
+            <h2>Последние чеки</h2>
+        </div>
+        <div class="period-caption">
+            Прошлый период:
+            {{ result.comparison.previous_date_from }} —
+            {{ result.comparison.previous_date_to }}
+        </div>
+    </div>
     {% if result.recent_checks %}
     <div class="table-wrap">
-        <table>
+        <table class="modern-table">
             <thead>
                 <tr>
                     <th>Счёт</th>
@@ -149,21 +201,122 @@
             <tbody>
             {% for row in result.recent_checks %}
                 <tr>
-                    <td>{{ row.gest_Name or row.gest_ID }}</td>
+                    <td><strong>{{ row.gest_Name or row.gest_ID }}</strong></td>
                     <td>{{ row.first_order_time }}</td>
                     <td>{{ row.last_order_time }}</td>
                     <td>{{ "{:,.0f}".format(row.item_count).replace(",", " ") }}</td>
-                    <td>
-                        {{ "{:,.2f}".format(row.check_sum).replace(",", " ") }} ₽
-                    </td>
+                    <td><strong>{{ "{:,.2f}".format(row.check_sum).replace(",", " ") }} ₽</strong></td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
-    {% else %}
-    <p class="muted">За выбранный период чеков нет.</p>
     {% endif %}
 </section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+const dailyLabels = {{ result.daily | map(attribute='sale_date') | list | tojson }};
+const dailyRevenue = {{ result.daily | map(attribute='revenue') | list | tojson }};
+const dailyChecks = {{ result.daily | map(attribute='checks_count') | list | tojson }};
+
+const hourlyLabels = {{ result.hourly | map(attribute='sale_hour') | list | tojson }}.map(
+    hour => String(hour).padStart(2, '0') + ':00'
+);
+const hourlyRevenue = {{ result.hourly | map(attribute='revenue') | list | tojson }};
+
+const money = value => new Intl.NumberFormat('ru-RU').format(value) + ' ₽';
+
+new Chart(document.getElementById('dailyRevenueChart'), {
+    type: 'line',
+    data: {
+        labels: dailyLabels,
+        datasets: [{
+            label: 'Выручка',
+            data: dailyRevenue,
+            borderColor: '#a53124',
+            backgroundColor: 'rgba(165, 49, 36, 0.12)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        }, {
+            label: 'Чеки',
+            data: dailyChecks,
+            borderColor: '#6e625b',
+            backgroundColor: 'transparent',
+            tension: 0.35,
+            pointRadius: 3,
+            yAxisID: 'checks'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+                callbacks: {
+                    label: context => context.dataset.label === 'Выручка'
+                        ? money(context.parsed.y)
+                        : context.parsed.y + ' чек.'
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { callback: value => money(value) },
+                grid: { color: 'rgba(117,107,101,.12)' }
+            },
+            checks: {
+                position: 'right',
+                beginAtZero: true,
+                grid: { display: false },
+                ticks: { precision: 0 }
+            },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+new Chart(document.getElementById('hourlyRevenueChart'), {
+    type: 'bar',
+    data: {
+        labels: hourlyLabels,
+        datasets: [{
+            label: 'Выручка',
+            data: hourlyRevenue,
+            backgroundColor: '#a53124',
+            borderRadius: 8,
+            maxBarThickness: 38
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: context => money(context.parsed.y)
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { callback: value => money(value) },
+                grid: { color: 'rgba(117,107,101,.12)' }
+            },
+            x: { grid: { display: false } }
+        }
+    }
+});
+</script>
 {% endif %}
 {% endblock %}

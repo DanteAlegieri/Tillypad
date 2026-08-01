@@ -5,24 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Гастродом №3{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
-<header class="topbar">
-    <div>
-        <div class="brand">ГАСТРОДОМ №3</div>
-        <div class="subtitle">Tillypad Dashboard v1.2</div>
-    </div>
-    <nav>
-        <a href="/">Главная</a>
-        <a href="/sales">Продажи</a>
-        <a href="/sql">SQL-дашборд</a>
-        <a href="/sql-explorer">SQL Explorer</a>
-        <a href="/schema-map">Карта базы</a>
-    </nav>
-</header>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-mark">Г3</div>
+            <div>
+                <div class="brand-name">ГАСТРОДОМ №3</div>
+                <div class="brand-version">Dashboard v1.3.1</div>
+            </div>
+        </div>
 
-<main class="container">
-    {% block content %}{% endblock %}
-</main>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-link">
+                <span class="nav-icon">⌂</span>
+                <span>Главная</span>
+            </a>
+            <a href="/sales" class="nav-link">
+                <span class="nav-icon">₽</span>
+                <span>Продажи</span>
+            </a>
+            <a href="/sql" class="nav-link">
+                <span class="nav-icon">▤</span>
+                <span>SQL-дашборд</span>
+            </a>
+            <a href="/sql-explorer" class="nav-link">
+                <span class="nav-icon">⌕</span>
+                <span>SQL Explorer</span>
+            </a>
+            <a href="/schema-map" class="nav-link">
+                <span class="nav-icon">⌘</span>
+                <span>Карта базы</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <span class="status-dot"></span>
+            SQL Server
+        </div>
+    </aside>
+
+    <div class="app-main">
+        <header class="mobile-header">
+            <div class="brand-name">ГАСТРОДОМ №3</div>
+        </header>
+        <main class="container">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+{% block scripts %}{% endblock %}
 </body>
 </html>

@@ -17,6 +17,8 @@ class SalesService:
         return {
             "summary": self.repository.summary(date_from, date_to),
             "hourly": self.repository.hourly_sales(date_from, date_to),
+            "daily": self.repository.daily_sales(date_from, date_to),
+            "comparison": self.repository.comparison(date_from, date_to),
             "top_items": self.repository.top_items(date_from, date_to),
             "recent_checks": self.repository.recent_checks(date_from, date_to),
         }

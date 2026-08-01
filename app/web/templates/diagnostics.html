@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Диагностика API{% endblock %}
+{% block content %}
+<section class="panel">
+    <h1>Диагностика API</h1>
+    <p>
+        Здесь выполняются только GET-запросы.
+        Токен хранится в локальном файле <span class="mono">.env</span>.
+    </p>
+
+    <form method="post">
+        <label>Target</label>
+        <input name="target" value="{{ target }}" required>
+
+        <label>JSON-фильтр</label>
+        <textarea name="body" rows="7" placeholder='[{"gest_ID":"GUID"}]'>{{ body }}</textarea>
+
+        <button type="submit">Выполнить GET-запрос</button>
+    </form>
+
+    {% if error %}
+        <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+        <h2>Ответ</h2>
+        <pre>{{ result }}</pre>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,8 +1,9 @@
 @echo off
+setlocal
 set PYTHON_EXE=C:\Users\Dante Alegieri\AppData\Local\Programs\Python\Python313\python.exe
 
 if not exist "%PYTHON_EXE%" (
-    echo Python не найден по адресу:
+    echo Python не найден:
     echo %PYTHON_EXE%
     pause
     exit /b 1
@@ -10,7 +11,7 @@ if not exist "%PYTHON_EXE%" (
 
 if not exist ".env" (
     echo Не найден файл .env
-    echo Скопируйте .env.example в .env и вставьте токен.
+    echo Скопируйте .env.example в .env и вставьте токен Tillypad.
     pause
     exit /b 1
 )

@@ -191,6 +191,16 @@ def sales_dashboard(
         context={
             "result": result,
             "error": error,
+            "today": date.today(),
+            "yesterday": date.today() - timedelta(days=1),
+            "this_month_from": date.today().replace(day=1),
+            "this_month_to": date.today(),
+            "previous_month_to": (
+                date.today().replace(day=1) - timedelta(days=1)
+            ),
+            "previous_month_from": (
+                date.today().replace(day=1) - timedelta(days=1)
+            ).replace(day=1),
         },
     )
 
@@ -496,5 +506,5 @@ def database_explorer_table(
 def health():
     return {
         "status": "ok",
-        "version": "11.1.2",
+        "version": "12.1.0",
     }

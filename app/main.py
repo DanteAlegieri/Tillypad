@@ -8,7 +8,7 @@ configure_logging()
 
 app = FastAPI(
     title="TillyPad Restaurant OS",
-    version="11.1.2",
+    version="12.1.0",
 )
 
 app.mount(

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Цифровой маркетолог{% endblock %}
+
+{% block content %}
+<section class="marketing-header">
+    <div>
+        <div class="eyebrow">ЕДИНЫЙ ДВИЖОК РЕКОМЕНДАЦИЙ</div>
+        <h1>Цифровой маркетолог</h1>
+        <p>Возможности роста среднего чека, связки товаров и план действий.</p>
+    </div>
+    <form class="tech-filter" method="get">
+        <label><span>С</span><input type="date" name="date_from" value="{{ result.date_from }}"></label>
+        <label><span>По</span><input type="date" name="date_to" value="{{ result.date_to }}"></label>
+        <button type="submit">Показать</button>
+    </form>
+</section>
+
+<section class="panel daily-brief">
+    <div>
+        <div class="eyebrow">ЧТО ИЗМЕНИЛОСЬ</div>
+        <h2>Краткий отчёт аналитика</h2>
+        <p>
+            Сравнение с периодом
+            {{ result.live_analyst.previous_from }} —
+            {{ result.live_analyst.previous_to }}.
+        </p>
+    </div>
+    <div class="daily-brief-columns">
+        <article class="brief-positive">
+            <h3>Положительные изменения</h3>
+            {% for line in result.live_analyst.positives %}
+            <p>+ {{ line }}</p>
+            {% else %}
+            <p>Значимых положительных изменений не найдено.</p>
+            {% endfor %}
+        </article>
+        <article class="brief-negative">
+            <h3>Требуют внимания</h3>
+            {% for line in result.live_analyst.negatives %}
+            <p>− {{ line }}</p>
+            {% else %}
+            <p>Критических отклонений не найдено.</p>
+            {% endfor %}
+        </article>
+    </div>
+</section>
+
+<section class="panel live-feed-panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ЖИВОЙ ЦИФРОВОЙ АНАЛИТИК</div>
+            <h2>Лента событий и сигналов</h2>
+        </div>
+        <span class="feed-note">События сформированы из фактических данных выбранного периода</span>
+    </div>
+
+    <div class="live-feed">
+        {% for event in result.live_analyst.events %}
+        <article class="feed-event feed-{{ event.level }}">
+            <time>{{ event.time }}</time>
+            <div class="feed-marker"></div>
+            <div class="feed-content">
+                <h3>{{ event.title }}</h3>
+                <p>{{ event.body }}</p>
+                <a href="{{ event.route }}">{{ event.action }} →</a>
+            </div>
+        </article>
+        {% else %}
+        <p class="muted">Недостаточно данных для формирования событий.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="marketing-hero panel">
+    <div>
+        <div class="eyebrow">ПЛАН ДЕЙСТВИЙ</div>
+        <h2>Найдено {{ result.recommendations|length }} рекомендаций</h2>
+        <p>
+            Рекомендации объединены из продаж, меню и анализа корзины.
+            Оценочный потенциал допродаж рассчитан консервативно:
+            15% от чеков без связанного товара.
+        </p>
+    </div>
+    <div class="marketing-potential">
+        <span>Оценочный потенциал</span>
+        <strong>{{ "{:,.0f}".format(result.estimated_potential).replace(",", " ") }} ₽</strong>
+        <small>за выбранный период</small>
+    </div>
+</section>
+
+<section class="marketing-kpis">
+    <article><span>Критические</span><strong>{{ result.priorities.critical }}</strong></article>
+    <article><span>Высокий приоритет</span><strong>{{ result.priorities.high }}</strong></article>
+    <article><span>Маркетинговые связи</span><strong>{{ result.sources.marketer }}</strong></article>
+    <article><span>Здоровье меню</span><strong>{{ result.menu_health }}/100</strong></article>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ЧТО НУЖНО СДЕЛАТЬ</div>
+            <h2>Единый план рекомендаций</h2>
+        </div>
+    </div>
+
+    <div class="recommendation-list">
+        {% for item in result.recommendations %}
+        <article class="recommendation-card priority-{{ item.priority }}">
+            <div class="recommendation-priority">
+                {% if item.priority == "critical" %}Срочно
+                {% elif item.priority == "high" %}Высокий
+                {% elif item.priority == "medium" %}Средний
+                {% else %}Низкий{% endif %}
+            </div>
+            <div class="recommendation-body">
+                <span class="recommendation-source">{{ item.source }}</span>
+                <h3>{{ item.title }}</h3>
+                <p><strong>Действие:</strong> {{ item.action }}</p>
+                <p><strong>Почему:</strong> {{ item.reason }}</p>
+                {% if item.expected_effect %}
+                <div class="recommendation-effect">{{ item.expected_effect }}</div>
+                {% endif %}
+            </div>
+            <div class="recommendation-side">
+                <span>Уверенность</span>
+                <strong>{{ item.confidence }}%</strong>
+                {% if item.route %}
+                <a href="{{ item.route }}">Открыть →</a>
+                {% endif %}
+            </div>
+        </article>
+        {% else %}
+        <p class="muted">За выбранный период рекомендации не сформированы.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="eyebrow">АНАЛИЗ КОРЗИНЫ</div>
+    <h2>Лучшие возможности допродажи</h2>
+
+    <div class="marketing-pair-grid">
+        {% for row in result.opportunities %}
+        <article>
+            <div class="pair-arrow">
+                <strong>{{ row.base_item_name }}</strong>
+                <span>+</span>
+                <strong>{{ row.pair_item_name }}</strong>
+            </div>
+            <dl>
+                <div><dt>Совместно</dt><dd>{{ "%.1f"|format(row.attach_rate) }}%</dd></div>
+                <div><dt>Клиенты без дополнения</dt><dd>{{ row.missing_checks }} чек.</dd></div>
+                <div><dt>Средняя цена допа</dt><dd>{{ "{:,.0f}".format(row.pair_avg_price).replace(",", " ") }} ₽</dd></div>
+                <div><dt>Оценочная упущенная допродажа</dt><dd>{{ "{:,.0f}".format(row.estimated_potential).replace(",", " ") }} ₽</dd></div>
+            </dl>
+        </article>
+        {% else %}
+        <p class="muted">Для анализа корзины недостаточно данных.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

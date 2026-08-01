@@ -11,6 +11,8 @@ from app.services.dashboard_service import DashboardService
 from app.services.explorer_service import ExplorerService
 from app.services.schema_map_service import SchemaMapService
 from app.services.sales_service import SalesService
+from app.services.menu_analytics_service import MenuAnalyticsService
+from app.services.recommendation_service import RecommendationService
 from app.services.menu_service import MenuService
 from app.services.finance_service import FinanceService
 from app.services.operations_service import OperationsService
@@ -205,24 +207,43 @@ def sales_dashboard(
     )
 
 
-@router.get("/menu", response_class=HTMLResponse)
-def menu_dashboard(
+@router.get("/marketing", response_class=HTMLResponse)
+def marketing_dashboard(
     request: Request,
     date_from: date | None = None,
     date_to: date | None = None,
-    search: str = "",
-    group_id: str = "",
 ):
     result = None
     error = None
 
     try:
-        result = MenuService().load(
+        result = RecommendationService().dashboard(
             date_from,
             date_to,
-            search,
-            group_id,
         )
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="marketing_dashboard.html",
+        context={
+            "result": result,
+            "error": error,
+        },
+    )
+
+
+@router.get("/menu", response_class=HTMLResponse)
+def menu_dashboard(
+    request: Request,
+    date_from: date | None = None,
+    date_to: date | None = None,
+):
+    result = None
+    error = None
+    try:
+        result = MenuAnalyticsService().dashboard(date_from, date_to)
     except SqlServerError as exc:
         error = str(exc)
 
@@ -232,9 +253,36 @@ def menu_dashboard(
         context={
             "result": result,
             "error": error,
-            "search": search,
-            "group_id": group_id,
         },
+    )
+
+
+@router.get("/menu/item/{item_id}", response_class=HTMLResponse)
+def menu_item_detail(
+    request: Request,
+    item_id: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+):
+    result = None
+    error = None
+    try:
+        result = MenuAnalyticsService().item_detail(
+            item_id,
+            date_from,
+            date_to,
+        )
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="menu_item_detail.html",
+        context={
+            "result": result,
+            "error": error,
+        },
+        status_code=200 if result or error else 404,
     )
 
 
@@ -506,5 +554,5 @@ def database_explorer_table(
 def health():
     return {
         "status": "ok",
-        "version": "12.1.0",
+        "version": "14.2.0",
     }

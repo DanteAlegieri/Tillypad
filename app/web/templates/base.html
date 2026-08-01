@@ -14,57 +14,146 @@
             <div class="brand-mark">Г3</div>
             <div>
                 <div class="brand-name">ГАСТРОДОМ №3</div>
-                <div class="brand-version">Система управления рестораном<br>для TillyPad<br><span class="brand-version">v12.1.0.1.1.1.1.1</span></div>
+                <div class="brand-version">Система управления рестораном<br>для TillyPad<br><span class="brand-version">v14.2</span></div>
             </div>
         </div>
 
         <nav class="sidebar-nav">
-            <a href="/" class="nav-link">
-                <span class="nav-icon">◎</span>
-                <span>Цифровой управляющий</span>
-            </a>
-            <a href="/operations" class="nav-link">
-                <span class="nav-icon">⌂</span>
-                <span>Операционный центр</span>
-            </a>
-            <a href="/decisions" class="nav-link">
-                <span class="nav-icon">◆</span>
-                <span>Центр решений</span>
-            </a>
-            <a href="/sales" class="nav-link">
-                <span class="nav-icon">₽</span>
-                <span>Продажи</span>
-            </a>
-            <a href="/menu" class="nav-link">
-                <span class="nav-icon">◉</span>
-                <span>Меню</span>
-            </a>
-            <a href="/finance" class="nav-link">
-                <span class="nav-icon">₽</span>
-                <span>Финансы</span>
-            </a>
-            <a href="/delivery" class="nav-link">
-                <span class="nav-icon">➜</span>
-                <span>Доставка</span>
-            </a>
-            <a href="/bi" class="nav-link">
-                <span class="nav-icon">◆</span>
-                <span>Бизнес-аналитика</span>
-            </a>
-            <a href="/sql-explorer" class="nav-link">
-                <span class="nav-icon">⌕</span>
-                <span>Консоль SQL</span>
-            </a>
-            <a href="/schema-map" class="nav-link">
-                <span class="nav-icon">⌘</span>
-                <span>Карта базы</span>
-            </a>
-        
-            <a href="/database-explorer" class="nav-link">
-                <span class="nav-icon">⌕</span>
-                <span>Исследователь TillyPad</span>
-            </a>
+            <div class="nav-section">
+                <div class="nav-section-title">УПРАВЛЕНИЕ</div>
 
+                <a href="/"
+                   class="nav-link {% if request.url.path == '/' %}active{% endif %}"
+                   {% if request.url.path == '/' %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">◎</span>
+                    <span class="nav-copy">
+                        <strong>Цифровой управляющий</strong>
+                        <small>Главная картина бизнеса</small>
+                    </span>
+                </a>
+
+                <a href="/operations"
+                   class="nav-link {% if request.url.path.startswith('/operations') %}active{% endif %}"
+                   {% if request.url.path.startswith('/operations') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">⌂</span>
+                    <span class="nav-copy">
+                        <strong>Операционный центр</strong>
+                        <small>Состояние ресторана сейчас</small>
+                    </span>
+                </a>
+
+                <a href="/decisions"
+                   class="nav-link {% if request.url.path.startswith('/decisions') %}active{% endif %}"
+                   {% if request.url.path.startswith('/decisions') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">◆</span>
+                    <span class="nav-copy">
+                        <strong>Центр решений</strong>
+                        <small>Единый план действий</small>
+                    </span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">ЦИФРОВЫЕ СОТРУДНИКИ</div>
+
+                <a href="/marketing"
+                   class="nav-link {% if request.url.path.startswith('/marketing') %}active{% endif %}"
+                   {% if request.url.path.startswith('/marketing') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">↗</span>
+                    <span class="nav-copy">
+                        <strong>Цифровой маркетолог</strong>
+                        <small>Допродажи и возможности роста</small>
+                    </span>
+                </a>
+
+                <a href="/menu"
+                   class="nav-link {% if request.url.path.startswith('/menu') %}active{% endif %}"
+                   {% if request.url.path.startswith('/menu') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">◉</span>
+                    <span class="nav-copy">
+                        <strong>Цифровой технолог</strong>
+                        <small>Меню и эффективность блюд</small>
+                    </span>
+                </a>
+
+                <a href="/delivery"
+                   class="nav-link {% if request.url.path.startswith('/delivery') %}active{% endif %}"
+                   {% if request.url.path.startswith('/delivery') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">➜</span>
+                    <span class="nav-copy">
+                        <strong>Цифровой диспетчер</strong>
+                        <small>Доставка и работа курьеров</small>
+                    </span>
+                </a>
+
+                <a href="/finance"
+                   class="nav-link {% if request.url.path.startswith('/finance') %}active{% endif %}"
+                   {% if request.url.path.startswith('/finance') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">₽</span>
+                    <span class="nav-copy">
+                        <strong>Цифровой финансист</strong>
+                        <small>Деньги и финансовые показатели</small>
+                    </span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">АНАЛИТИКА</div>
+
+                <a href="/sales"
+                   class="nav-link {% if request.url.path.startswith('/sales') %}active{% endif %}"
+                   {% if request.url.path.startswith('/sales') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">▥</span>
+                    <span class="nav-copy">
+                        <strong>Продажи</strong>
+                        <small>Выручка, чеки и спрос</small>
+                    </span>
+                </a>
+
+                <a href="/bi"
+                   class="nav-link {% if request.url.path.startswith('/bi') %}active{% endif %}"
+                   {% if request.url.path.startswith('/bi') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">◇</span>
+                    <span class="nav-copy">
+                        <strong>Бизнес-аналитика</strong>
+                        <small>Углублённые отчёты</small>
+                    </span>
+                </a>
+            </div>
+
+            <div class="nav-section nav-section-system">
+                <div class="nav-section-title">СИСТЕМА</div>
+
+                <a href="/sql-explorer"
+                   class="nav-link {% if request.url.path.startswith('/sql-explorer') %}active{% endif %}"
+                   {% if request.url.path.startswith('/sql-explorer') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">⌕</span>
+                    <span class="nav-copy">
+                        <strong>Консоль SQL</strong>
+                        <small>Запросы только для чтения</small>
+                    </span>
+                </a>
+
+                <a href="/schema-map"
+                   class="nav-link {% if request.url.path.startswith('/schema-map') %}active{% endif %}"
+                   {% if request.url.path.startswith('/schema-map') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">⌘</span>
+                    <span class="nav-copy">
+                        <strong>Карта базы</strong>
+                        <small>Таблицы и связи</small>
+                    </span>
+                </a>
+
+                <a href="/database-explorer"
+                   class="nav-link {% if request.url.path.startswith('/database-explorer') %}active{% endif %}"
+                   {% if request.url.path.startswith('/database-explorer') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">▦</span>
+                    <span class="nav-copy">
+                        <strong>Исследователь TillyPad</strong>
+                        <small>Структура и примеры данных</small>
+                    </span>
+                </a>
+            </div>
         </nav>
 
         <div class="sidebar-footer">

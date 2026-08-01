@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ result.item.item_name if result else "Блюдо" }}{% endblock %}
+
+{% block content %}
+{% if not result %}
+<div class="error-card">Позиция не найдена.</div>
+{% else %}
+<section class="tech-header">
+    <div>
+        <div class="eyebrow">КАРТОЧКА БЛЮДА</div>
+        <h1>{{ result.item.item_name }}</h1>
+        <p>{{ result.item.group_name }} · {{ result.item.matrix }}</p>
+    </div>
+    <a class="secondary-button" href="/menu?date_from={{ result.date_from }}&date_to={{ result.date_to }}">← Назад к меню</a>
+</section>
+
+<section class="dish-score-card dish-{{ result.item.recommendation.level }}">
+    <div class="dish-score-main">
+        <span>Индекс эффективности</span>
+        <strong>{{ result.item.index_score }}/100</strong>
+        <em>{{ result.item.matrix }} · {{ result.item.matrix_label.title }}</em>
+    </div>
+    <div>
+        <h2>{{ result.item.recommendation.title }}</h2>
+        <p>{{ result.item.recommendation.text }}</p>
+        <div class="dish-reason-list">
+            {% for reason in result.item.reasons %}
+            <span>• {{ reason }}</span>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="tech-kpis">
+    <article><span>Продано</span><strong>{{ "{:,.0f}".format(result.item.quantity).replace(",", " ") }} шт.</strong></article>
+    <article><span>Выручка</span><strong>{{ "{:,.0f}".format(result.item.revenue).replace(",", " ") }} ₽</strong></article>
+    <article><span>Средняя цена</span><strong>{{ "{:,.0f}".format(result.item.avg_price).replace(",", " ") }} ₽</strong></article>
+    <article><span>Дней с продажами</span><strong>{{ result.item.active_days }}</strong></article>
+</section>
+
+<section class="panel">
+    <div class="eyebrow">ИЗ ЧЕГО СКЛАДЫВАЕТСЯ ИНДЕКС</div>
+    <h2>Оценка позиции</h2>
+    <div class="score-breakdown">
+        <article>
+            <div><span>Популярность</span><b>{{ result.item.popularity_score }}%</b></div>
+            <div class="score-track"><span style="width: {{ result.item.popularity_score }}%"></span></div>
+            <small>Вес в индексе: 45%</small>
+        </article>
+        <article>
+            <div><span>Вклад в выручку</span><b>{{ result.item.revenue_score }}%</b></div>
+            <div class="score-track"><span style="width: {{ result.item.revenue_score }}%"></span></div>
+            <small>Вес в индексе: 35%</small>
+        </article>
+        <article>
+            <div><span>Стабильность спроса</span><b>{{ result.item.stability_score }}%</b></div>
+            <div class="score-track"><span style="width: {{ result.item.stability_score }}%"></span></div>
+            <small>Вес в индексе: 20%</small>
+        </article>
+    </div>
+</section>
+
+<section class="tech-two-columns">
+    <article class="panel">
+        <div class="eyebrow">ДИНАМИКА</div>
+        <h2>Продажи по дням</h2>
+        <div class="sales-chart-wrap"><canvas id="dishDailyChart"></canvas></div>
+    </article>
+    <article class="panel">
+        <div class="eyebrow">СПРОС</div>
+        <h2>Продажи по часам</h2>
+        <div class="sales-chart-wrap"><canvas id="dishHourlyChart"></canvas></div>
+    </article>
+</section>
+
+<section class="tech-two-columns">
+    <article class="panel">
+        <div class="eyebrow">ПОКУПАЮТ ВМЕСТЕ</div>
+        <h2>Связанные позиции</h2>
+        <div class="tech-list">
+            {% for pair in result.pairs %}
+            <div class="pair-row">
+                <div>
+                    <strong>{{ pair.item_name }}</strong>
+                    <small>{{ pair.pair_checks }} совместных чеков</small>
+                </div>
+                <b>{{ "%.1f"|format(pair.attach_rate) }}%</b>
+            </div>
+            {% else %}
+            <p class="muted">Совместные покупки не найдены.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="eyebrow">ВЫВОД</div>
+        <h2>Что говорит цифровой технолог</h2>
+        <div class="dish-conclusion">
+            <p><strong>Класс:</strong> {{ result.item.matrix }}</p>
+            <p><strong>Доля выручки:</strong> {{ result.item.revenue_share }}%</p>
+            <p><strong>Колебание спроса:</strong> {{ result.item.variation }}%</p>
+            {% if result.peak_hour %}
+            <p><strong>Пиковый час:</strong> {{ "%02d"|format(result.peak_hour.sale_hour) }}:00–{{ "%02d"|format(result.peak_hour.sale_hour + 1) }}:00</p>
+            {% endif %}
+            {% if result.best_day %}
+            <p><strong>Лучший день:</strong> {{ result.best_day.sale_date }}</p>
+            {% endif %}
+            <hr>
+            <div class="technology-action action-{{ result.item.action.code }}">
+                <span>Рекомендуемое действие</span>
+                <strong>{{ result.item.action.title }}</strong>
+                <p>{{ result.item.action.text }}</p>
+            </div>
+        </div>
+    </article>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+const dailyLabels = {{ result.daily | map(attribute="sale_date") | list | tojson }};
+const dailyQuantity = {{ result.daily | map(attribute="quantity") | list | tojson }};
+const dailyRevenue = {{ result.daily | map(attribute="revenue") | list | tojson }};
+const hourlyLabels = {{ result.hourly | map(attribute="sale_hour") | list | tojson }}.map(h => String(h).padStart(2, "0") + ":00");
+const hourlyQuantity = {{ result.hourly | map(attribute="quantity") | list | tojson }};
+
+new Chart(document.getElementById("dishDailyChart"), {
+    type: "bar",
+    data: {
+        labels: dailyLabels,
+        datasets: [{
+            label: "Продано",
+            data: dailyQuantity,
+            backgroundColor: "#a53124",
+            borderRadius: 7
+        }, {
+            type: "line",
+            label: "Выручка",
+            data: dailyRevenue,
+            borderColor: "#d28b35",
+            backgroundColor: "#d28b35",
+            yAxisID: "revenue",
+            tension: .3
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: { beginAtZero: true },
+            revenue: { position: "right", beginAtZero: true, grid: { display: false } }
+        }
+    }
+});
+
+new Chart(document.getElementById("dishHourlyChart"), {
+    type: "bar",
+    data: {
+        labels: hourlyLabels,
+        datasets: [{
+            label: "Продано",
+            data: hourlyQuantity,
+            backgroundColor: "#39738a",
+            borderRadius: 7
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

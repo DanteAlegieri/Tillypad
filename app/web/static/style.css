@@ -3494,3 +3494,92 @@ table td small{
         grid-template-columns:1fr;
     }
 }
+
+
+/* v11.1 — улучшение карточки заказа */
+
+.timeline-dot{background:#718a98}
+.timeline-state-0,.timeline-state-2{background:#d28b35}
+.timeline-state-3{background:#b33427}
+.timeline-state-5{background:#d07828}
+.timeline-state-6{background:#4d7c63}
+.timeline-state-7{background:#39738a}
+.timeline-state-1{background:#4d7c63}
+.timeline-duration{
+    display:block;
+    margin-top:6px;
+    color:#8d291f;
+    font-size:11px;
+    font-weight:700;
+}
+.order-info-comment{align-items:start}
+.order-info-comment dd{white-space:pre-line}
+.order-analysis-panel{
+    margin-bottom:16px;
+    border-left:6px solid var(--accent);
+}
+.order-analysis-heading{
+    display:flex;
+    justify-content:space-between;
+    gap:18px;
+    align-items:flex-start;
+}
+.analysis-confidence{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:3px;
+    padding:9px 12px;
+    border-radius:9px;
+    background:#f5eee8;
+}
+.analysis-confidence span{
+    color:var(--muted);
+    font-size:10px;
+}
+.analysis-confidence strong{color:var(--accent)}
+.order-analysis-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr 1.3fr;
+    gap:12px;
+    margin-top:18px;
+}
+.order-analysis-grid article{
+    padding:16px;
+    border:1px solid var(--border);
+    border-radius:11px;
+    background:#fff;
+}
+.order-analysis-grid article>span{
+    display:block;
+    margin-bottom:8px;
+    color:var(--muted);
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+}
+.order-analysis-grid article>strong{
+    display:block;
+    font-size:17px;
+    line-height:1.25;
+}
+.order-analysis-grid p{
+    margin:8px 0 0;
+    color:var(--muted);
+    font-size:11px;
+    line-height:1.45;
+}
+.order-analysis-grid ul{
+    margin:0;
+    padding-left:18px;
+}
+.order-analysis-grid li{
+    margin-bottom:7px;
+    font-size:12px;
+    line-height:1.35;
+}
+@media(max-width:900px){
+    .order-analysis-grid{grid-template-columns:1fr}
+    .order-analysis-heading{flex-direction:column}
+    .analysis-confidence{align-items:flex-start}
+}

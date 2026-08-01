@@ -28,13 +28,19 @@
     <article>
         <span>Полное время</span>
         <strong>{{ result.total_minutes }} мин</strong>
+        {% if result.analysis.norm_minutes %}
+        <small>
+            +{{ result.analysis.over_norm_minutes }} мин к нормативу
+            · {{ result.analysis.norm_percent }}% нормы
+        </small>
+        {% endif %}
     </article>
     <article>
         <span>Текущий статус</span>
         <strong>{{ result.state_name }}</strong>
     </article>
     <article>
-        <span>Курьер</span>
+        <span>{% if result.is_takeaway %}Способ получения{% else %}Курьер{% endif %}</span>
         <strong>{{ result.courier_name }}</strong>
     </article>
     <article>
@@ -53,13 +59,15 @@
             {% for event in result.timeline %}
             <div class="order-timeline-event">
                 <time>{{ event.state_date.strftime("%H:%M:%S") }}</time>
-                <span class="timeline-dot"></span>
+                <span class="timeline-dot timeline-state-{{ event.state_id }}"></span>
                 <div>
                     <strong>{{ event.state_name }}</strong>
                     <p>
                         {{ event.changed_by }}
                         {% if event.stage_minutes %}
-                        · этап занял {{ "%.1f"|format(event.stage_minutes) }} мин
+                        <span class="timeline-duration">
+                            ↓ {{ "%.1f"|format(event.stage_minutes) }} мин до следующего события
+                        </span>
                         {% endif %}
                     </p>
                 </div>
@@ -94,6 +102,42 @@
     </article>
 </section>
 
+<section class="panel order-analysis-panel">
+    <div class="order-analysis-heading">
+        <div>
+            <div class="eyebrow">ВЫВОД ЦИФРОВОГО УПРАВЛЯЮЩЕГО</div>
+            <h2>Что произошло с этим заказом</h2>
+        </div>
+        <div class="analysis-confidence">
+            <span>Уверенность</span>
+            <strong>{{ result.analysis.confidence }}</strong>
+        </div>
+    </div>
+
+    <div class="order-analysis-grid">
+        <article>
+            <span>Главный этап задержки</span>
+            <strong>{{ result.analysis.title }}</strong>
+            <p>
+                {{ result.analysis.minutes }} мин —
+                {{ result.analysis.share }}% полного времени заказа.
+            </p>
+        </article>
+        <article>
+            <span>Вывод</span>
+            <strong>{{ result.analysis.conclusion }}</strong>
+        </article>
+        <article>
+            <span>Что проверить</span>
+            <ul>
+                {% for check in result.analysis.checks %}
+                <li>{{ check }}</li>
+                {% endfor %}
+            </ul>
+        </article>
+    </div>
+</section>
+
 <section class="order-detail-grid">
     <article class="panel">
         <div class="eyebrow">СОСТАВ ЗАКАЗА</div>
@@ -120,10 +164,32 @@
         <dl class="order-info-list">
             <div><dt>Клиент</dt><dd>{{ result.client_name or "Не указан" }}</dd></div>
             <div><dt>Телефон</dt><dd>{{ result.client_phone or "Не указан" }}</dd></div>
-            <div><dt>Адрес</dt><dd>{{ result.client_address or "Не указан" }}</dd></div>
+            {% if not result.is_takeaway %}
+            <div><dt>Адрес</dt><dd>{{ result.address.full or "Не указан" }}</dd></div>
+            {% endif %}
+            {% if result.address.entrance %}
+            <div><dt>Подъезд</dt><dd>{{ result.address.entrance }}</dd></div>
+            {% endif %}
+            {% if result.address.floor %}
+            <div><dt>Этаж</dt><dd>{{ result.address.floor }}</dd></div>
+            {% endif %}
+            {% if result.address.payment %}
+            <div><dt>Оплата</dt><dd>{{ result.address.payment }}</dd></div>
+            {% endif %}
+            {% if result.address.bonuses %}
+            <div><dt>Бонусы</dt><dd>{{ result.address.bonuses }}</dd></div>
+            {% endif %}
+            {% if result.address.comment %}
+            <div class="order-info-comment">
+                <dt>Комментарий клиента</dt>
+                <dd>{{ result.address.comment }}</dd>
+            </div>
+            {% endif %}
             <div><dt>Открыт</dt><dd>{{ result.started_at.strftime("%d.%m.%Y %H:%M:%S") }}</dd></div>
             <div><dt>Закрыт</dt><dd>{{ result.completed_at.strftime("%d.%m.%Y %H:%M:%S") if result.completed_at else "Не закрыт" }}</dd></div>
+            {% if not result.is_takeaway %}
             <div><dt>Комментарий курьера</dt><dd>{{ result.courier_comment or "Нет" }}</dd></div>
+            {% endif %}
         </dl>
     </article>
 </section>

@@ -784,7 +784,11 @@ class DeliveryRepository:
             cursor.execute(
                 """
                 SELECT
-                    mi.mitm_Name AS item_name,
+                    COALESCE(
+                        NULLIF(LTRIM(RTRIM(mi.mitm_Name)), N''),
+                        NULLIF(LTRIM(RTRIM(oi.orit_Comment)), N''),
+                        N'Позиция без названия'
+                    ) AS item_name,
                     SUM(oi.orit_Count) AS item_count,
                     SUM(
                         (
@@ -796,11 +800,16 @@ class DeliveryRepository:
                 FROM dbo.tp_Orders AS o
                 INNER JOIN dbo.tp_OrderItems AS oi
                     ON oi.orit_ordr_ID = o.ordr_ID
-                INNER JOIN dbo.tp_MenuItems AS mi
+                LEFT JOIN dbo.tp_MenuItems AS mi
                     ON mi.mitm_ID = oi.orit_mitm_ID
                 WHERE o.ordr_gest_ID = ?
                   AND oi.orit_master_ID IS NULL
-                GROUP BY mi.mitm_Name
+                GROUP BY
+                    COALESCE(
+                        NULLIF(LTRIM(RTRIM(mi.mitm_Name)), N''),
+                        NULLIF(LTRIM(RTRIM(oi.orit_Comment)), N''),
+                        N'Позиция без названия'
+                    )
                 ORDER BY item_sum DESC
                 """,
                 delivery_id,

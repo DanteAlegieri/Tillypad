@@ -1,5 +1,7 @@
 from datetime import date, timedelta
 import re
+import xml.etree.ElementTree as ET
+import re
 from typing import Any
 
 from app.db.sql_server import SqlServer
@@ -774,6 +776,235 @@ class DeliveryService:
             ),
         }
 
+    @staticmethod
+    def _clean_phone(value: Any) -> str:
+        cleaned = DeliveryService._clean_tilly_text(value)
+        if not cleaned:
+            return ""
+
+        cleaned = re.sub(r"[^\d+() -]", "", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+        digits = re.sub(r"\D", "", cleaned)
+        if len(digits) == 11 and digits[0] in {"7", "8"}:
+            return (
+                f"+7 ({digits[1:4]}) "
+                f"{digits[4:7]}-{digits[7:9]}-{digits[9:11]}"
+            )
+        if len(digits) == 10:
+            return (
+                f"+7 ({digits[0:3]}) "
+                f"{digits[3:6]}-{digits[6:8]}-{digits[8:10]}"
+            )
+        return cleaned
+
+    @staticmethod
+    def _parse_delivery_address(value: Any) -> dict[str, str]:
+        if value is None:
+            raw = ""
+        else:
+            raw = str(value)
+            raw = "".join(
+                character
+                for character in raw
+                if ord(character) >= 32 and ord(character) != 127
+            ).strip()
+
+        result = {
+            "full": "",
+            "street": "",
+            "house": "",
+            "apartment": "",
+            "entrance": "",
+            "floor": "",
+            "comment": "",
+            "payment": "",
+            "bonuses": "",
+        }
+        if not raw:
+            return result
+
+        xml_start = raw.find("<Address")
+        xml_end = raw.rfind("</Address>")
+        xml_text = (
+            raw[xml_start:xml_end + len("</Address>")]
+            if xml_start >= 0 and xml_end >= 0
+            else raw
+        )
+
+        # Иногда TillyPad сохраняет XML с мусорным префиксом
+        # или дополнительными байтами перед тегом Address.
+        if "<Address" in xml_text:
+            xml_text = xml_text[xml_text.find("<Address"):]
+
+        try:
+            root = ET.fromstring(xml_text)
+            tag_map = {
+                "Street": "street",
+                "House": "house",
+                "Apartment": "apartment",
+                "Flat": "apartment",
+                "Entrance": "entrance",
+                "Floor": "floor",
+                "Comment": "comment",
+            }
+            for element in root.iter():
+                local_name = element.tag.split("}")[-1]
+                key = tag_map.get(local_name)
+                text = DeliveryService._clean_tilly_text(element.text)
+                if key and text:
+                    result[key] = text
+        except ET.ParseError:
+            for xml_tag, key in (
+                ("Street", "street"),
+                ("House", "house"),
+                ("Apartment", "apartment"),
+                ("Flat", "apartment"),
+                ("Entrance", "entrance"),
+                ("Floor", "floor"),
+                ("Comment", "comment"),
+            ):
+                match = re.search(
+                    rf"<{xml_tag}\b[^>]*>(.*?)</{xml_tag}>",
+                    xml_text,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
+                if match:
+                    result[key] = DeliveryService._clean_tilly_text(
+                        match.group(1)
+                    )
+
+        comment = result["comment"]
+        if comment:
+            payment_match = re.search(
+                r"(?:способ\s+оплаты|оплата)\s*:\s*([^|;\n]+)",
+                comment,
+                flags=re.IGNORECASE,
+            )
+            if payment_match:
+                result["payment"] = payment_match.group(1).strip()
+
+            bonus_match = re.search(
+                r"бонус\w*\s*:\s*([+-]?\d+(?:[.,]\d+)?)",
+                comment,
+                flags=re.IGNORECASE,
+            )
+            if bonus_match:
+                result["bonuses"] = bonus_match.group(1).replace(",", ".")
+
+        address_parts = []
+        if result["street"]:
+            address_parts.append(result["street"])
+        if result["house"]:
+            address_parts.append(result["house"])
+        if result["apartment"]:
+            address_parts.append(f"кв. {result['apartment']}")
+
+        result["full"] = ", ".join(address_parts)
+        if not result["full"]:
+            plain = re.sub(r"<[^>]+>", " ", raw)
+            plain = re.sub(r"[^0-9A-Za-zА-Яа-яЁё.,/() -]", " ", plain)
+            plain = re.sub(r"\s+", " ", plain).strip()
+
+            meaningful_chars = re.sub(r"[^0-9A-Za-zА-Яа-яЁё]", "", plain)
+            result["full"] = plain if len(meaningful_chars) >= 4 else ""
+
+        return result
+
+    @staticmethod
+    def _order_analysis(order: dict[str, Any]) -> dict[str, Any]:
+        total = float(order.get("total_minutes") or 0)
+        is_takeaway = bool(order.get("is_takeaway"))
+        bottleneck = order.get("bottleneck") or {
+            "title": "Нет данных",
+            "minutes": 0,
+        }
+        bottleneck_minutes = float(bottleneck.get("minutes") or 0)
+        share = (
+            round(bottleneck_minutes / total * 100, 1)
+            if total > 0 else 0
+        )
+
+        title = bottleneck.get("title") or "Нет данных"
+        checks: list[str] = []
+
+        if title == "Ожидание кухни":
+            conclusion = (
+                "Основная задержка возникла до начала приготовления."
+            )
+            checks = [
+                "Проверить, когда заказ был подтверждён сотрудником.",
+                "Уточнить, почему кухня не начала готовить заказ вовремя.",
+                "Проверить загрузку кухни и наличие сотрудников в этот период.",
+            ]
+        elif title == "Приготовление":
+            conclusion = (
+                "Основная задержка возникла непосредственно "
+                "во время приготовления."
+            )
+            checks = [
+                "Проверить состав и сложность заказа.",
+                "Сравнить время приготовления этих позиций с нормативом.",
+                "Проверить загрузку кухни и работу смены.",
+            ]
+        elif title == "Ожидание курьера":
+            conclusion = (
+                "Готовый заказ долго ожидал назначения или прибытия курьера."
+            )
+            checks = [
+                "Проверить доступность курьеров в этот момент.",
+                "Уточнить время назначения курьера.",
+                "Сравнить количество заказов и курьеров в час задержки.",
+            ]
+        elif title == "В пути":
+            if is_takeaway:
+                conclusion = (
+                    "Для самовывоза этап «В пути» не должен влиять "
+                    "на длительность заказа."
+                )
+                checks = [
+                    "Проверить корректность статусов самовывоза.",
+                    "Убедиться, что заказ закрывается после выдачи клиенту.",
+                ]
+            else:
+                conclusion = (
+                    "Основная задержка возникла после передачи заказа курьеру."
+                )
+                checks = [
+                    "Проверить корректность времени перевода в статус «В пути».",
+                    "Уточнить маршрут, адрес и фактическое время доставки.",
+                    "Проверить, не забыли ли своевременно закрыть заказ.",
+                ]
+        else:
+            conclusion = "Недостаточно данных для точного вывода."
+            checks = ["Проверить последовательность статусов заказа."]
+
+        if share >= 80:
+            confidence = "Высокая"
+        elif share >= 55:
+            confidence = "Средняя"
+        else:
+            confidence = "Низкая"
+
+        norm_minutes = float(
+            order.get("cooking_norm_minutes") or 0
+        ) + float(order.get("delivery_norm_minutes") or 0)
+
+        return {
+            "title": title,
+            "minutes": round(bottleneck_minutes, 1),
+            "share": share,
+            "confidence": confidence,
+            "conclusion": conclusion,
+            "checks": checks,
+            "norm_minutes": round(norm_minutes, 1),
+            "over_norm_minutes": round(max(total - norm_minutes, 0), 1),
+            "norm_percent": (
+                round(total / norm_minutes * 100, 1)
+                if norm_minutes > 0 else None
+            ),
+        }
+
     def load_orders(
         self,
         date_from: date | None = None,
@@ -863,8 +1094,39 @@ class DeliveryService:
             "courier_name",
             "state_name",
             "method_name",
+            "client_name",
+            "client_phone",
+            "courier_comment",
+            "extra_info",
         ):
             order[key] = self._clean_tilly_text(order.get(key))
+
+        order["client_phone"] = self._clean_phone(
+            order.get("client_phone")
+        )
+        order["address"] = self._parse_delivery_address(
+            order.get("client_address")
+        )
+        method_name = (order.get("method_name") or "").lower()
+        order["is_takeaway"] = (
+            "самовывоз" in method_name
+            or int(order.get("state_id") or -1) == 1
+            and not order.get("client_address")
+            and not order.get("courier_name")
+        )
+        if order["is_takeaway"]:
+            order["courier_name"] = "Самовывоз"
+            order["address"] = {
+                "full": "",
+                "street": "",
+                "house": "",
+                "apartment": "",
+                "entrance": "",
+                "floor": "",
+                "comment": "",
+                "payment": "",
+                "bonuses": "",
+            }
 
         for row in order["timeline"]:
             row["state_name"] = self._clean_tilly_text(
@@ -878,8 +1140,11 @@ class DeliveryService:
             )
 
         for item in order["items"]:
-            item["item_name"] = self._clean_tilly_text(
-                item.get("item_name")
+            item_name = self._clean_tilly_text(item.get("item_name"))
+            item["item_name"] = (
+                item_name.strip()
+                if item_name and item_name.strip()
+                else "Позиция без названия"
             )
             item["item_sum"] = float(item.get("item_sum") or 0)
 
@@ -916,5 +1181,6 @@ class DeliveryService:
             sum(float(item["item_sum"]) for item in order["items"]),
             2,
         )
+        order["analysis"] = self._order_analysis(order)
         return order
 

@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_host: str = "127.0.0.1"
     app_port: int = 8000
     app_reload: bool = True
+    daily_revenue_target: float = 10000.0
 
     tillypad_sql_server: str = "26.187.75.193"
     tillypad_sql_port: int = 1433

@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block title %}BI Аналитика — Гастродом №3{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div>
+        <div class="eyebrow">RESTAURANT BI</div>
+        <h1>BI Аналитика</h1>
+        <p>ABC/XYZ, корзина покупателей, дни недели и автоматические выводы.</p>
+    </div>
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+{% if result %}
+{% set analysis = result.analysis %}
+
+<section class="panel filter-panel">
+    <form method="get" class="period-form">
+        <div>
+            <label>Дата с</label>
+            <input
+                type="date"
+                name="date_from"
+                value="{{ analysis.date_from }}"
+            >
+        </div>
+        <div>
+            <label>Дата по</label>
+            <input
+                type="date"
+                name="date_to"
+                value="{{ analysis.date_to }}"
+            >
+        </div>
+        <div class="period-actions">
+            <button type="submit">Показать</button>
+            <a class="button-link secondary-link" href="/bi">
+                Последние 30 дней
+            </a>
+        </div>
+    </form>
+</section>
+
+<section class="kpi-grid bi-kpis">
+    <article class="kpi-card">
+        <div class="kpi-label">Выручка периода</div>
+        <div class="kpi-value">
+            {{ "{:,.0f}".format(analysis.total_revenue).replace(",", " ") }} ₽
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Класс A</div>
+        <div class="kpi-value">{{ analysis.a_count }}</div>
+        <div class="kpi-meta">ключевые позиции</div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Стабильные X</div>
+        <div class="kpi-value">{{ analysis.x_count }}</div>
+        <div class="kpi-meta">предсказуемый спрос</div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Нестабильные Z</div>
+        <div class="kpi-value">{{ analysis.z_count }}</div>
+        <div class="kpi-meta">нерегулярный спрос</div>
+    </article>
+</section>
+
+<section class="bi-layout">
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">ABC</div>
+                <h2>Вклад в выручку</h2>
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="abcChart"></canvas>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">XYZ</div>
+                <h2>Стабильность спроса</h2>
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="xyzChart"></canvas>
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">МАТРИЦА</div>
+            <h2>ABC / XYZ</h2>
+        </div>
+        <div class="period-caption">
+            {{ analysis.date_from }} — {{ analysis.date_to }}
+        </div>
+    </div>
+
+    <div class="matrix-grid">
+        {% for abc in ["A", "B", "C"] %}
+            {% for xyz in ["X", "Y", "Z"] %}
+            {% set code = abc + xyz %}
+            <article class="matrix-card matrix-{{ code|lower }}">
+                <div class="matrix-code">{{ code }}</div>
+                <div class="matrix-count">
+                    {{ analysis.matrix_counts.get(code, 0) }}
+                </div>
+                <div class="matrix-caption">
+                    {% if abc == "A" %}Высокая выручка{% elif abc == "B" %}Средняя выручка{% else %}Низкая выручка{% endif %}
+                    ·
+                    {% if xyz == "X" %}стабильно{% elif xyz == "Y" %}умеренно{% else %}нестабильно{% endif %}
+                </div>
+            </article>
+            {% endfor %}
+        {% endfor %}
+    </div>
+</section>
+
+<section class="bi-layout">
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">КОРЗИНА</div>
+                <h2>Что покупают вместе</h2>
+            </div>
+        </div>
+
+        {% if result.pairs %}
+        <div class="basket-list">
+            {% for row in result.pairs[:12] %}
+            <div class="basket-row">
+                <div class="basket-rank">{{ loop.index }}</div>
+                <div class="basket-items">
+                    <strong>{{ row.item_a }}</strong>
+                    <span>+</span>
+                    <strong>{{ row.item_b }}</strong>
+                </div>
+                <div class="basket-count">
+                    {{ row.pair_count }} раз
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Для анализа корзины недостаточно данных.</p>
+        {% endif %}
+    </article>
+
+    <article class="panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">НЕДЕЛЯ</div>
+                <h2>Выручка по дням недели</h2>
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="weekdayChart"></canvas>
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ИНСАЙТЫ</div>
+            <h2>Автоматические выводы</h2>
+        </div>
+    </div>
+
+    <div class="insight-grid">
+        {% for insight in result.insights %}
+        <article class="insight-card insight-{{ insight.level }}">
+            <h3>{{ insight.title }}</h3>
+            <p>{{ insight.text }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ПОЗИЦИИ</div>
+            <h2>ABC/XYZ по меню</h2>
+        </div>
+        <div class="period-caption">
+            {{ analysis.items|length }} позиций
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Позиция</th>
+                    <th>ABC</th>
+                    <th>XYZ</th>
+                    <th>Матрица</th>
+                    <th>Продано</th>
+                    <th>Выручка</th>
+                    <th>Доля</th>
+                    <th>Вариация</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in analysis.items %}
+                <tr>
+                    <td><strong>{{ item.item_name }}</strong></td>
+                    <td><span class="class-badge abc-{{ item.abc|lower }}">{{ item.abc }}</span></td>
+                    <td><span class="class-badge xyz-{{ item.xyz|lower }}">{{ item.xyz }}</span></td>
+                    <td><strong>{{ item.matrix }}</strong></td>
+                    <td>{{ "{:,.0f}".format(item.quantity).replace(",", " ") }}</td>
+                    <td>{{ "{:,.0f}".format(item.revenue).replace(",", " ") }} ₽</td>
+                    <td>{{ item.share }}%</td>
+                    <td>
+                        {% if item.variation is not none %}
+                            {{ item.variation }}%
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+new Chart(document.getElementById('abcChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['A', 'B', 'C'],
+        datasets: [{
+            data: [
+                {{ analysis.a_count }},
+                {{ analysis.b_count }},
+                {{ analysis.c_count }}
+            ],
+            backgroundColor: ['#a53124', '#d28b35', '#776b64'],
+            borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '64%',
+        plugins: {
+            legend: { position: 'bottom' }
+        }
+    }
+});
+
+new Chart(document.getElementById('xyzChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['X', 'Y', 'Z'],
+        datasets: [{
+            data: [
+                {{ analysis.x_count }},
+                {{ analysis.y_count }},
+                {{ analysis.z_count }}
+            ],
+            backgroundColor: ['#4d7c63', '#d28b35', '#a53124'],
+            borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '64%',
+        plugins: {
+            legend: { position: 'bottom' }
+        }
+    }
+});
+
+const weekdayLabels = {{ result.weekdays | map(attribute='weekday_name') | list | tojson }};
+const weekdayRevenue = {{ result.weekdays | map(attribute='revenue') | list | tojson }};
+const money = value =>
+    new Intl.NumberFormat('ru-RU').format(value) + ' ₽';
+
+new Chart(document.getElementById('weekdayChart'), {
+    type: 'bar',
+    data: {
+        labels: weekdayLabels,
+        datasets: [{
+            data: weekdayRevenue,
+            backgroundColor: '#a53124',
+            borderRadius: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: context => money(context.parsed.y)
+                }
+            }
+        },
+        scales: {
+            x: { grid: { display: false } },
+            y: {
+                beginAtZero: true,
+                ticks: { callback: value => money(value) }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Меню — Гастродом №3{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div>
+        <div class="eyebrow">КАТАЛОГ</div>
+        <h1>Меню</h1>
+        <p>Позиции, цены и статистика продаж.</p>
+    </div>
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+{% if result %}
+<section class="panel filter-panel">
+    <form method="get" class="menu-filter-form">
+        <div>
+            <label>Дата с</label>
+            <input
+                type="date"
+                name="date_from"
+                value="{{ result.summary.date_from }}"
+            >
+        </div>
+        <div>
+            <label>Дата по</label>
+            <input
+                type="date"
+                name="date_to"
+                value="{{ result.summary.date_to }}"
+            >
+        </div>
+        <div>
+            <label>Поиск</label>
+            <input
+                type="text"
+                name="search"
+                value="{{ search }}"
+                placeholder="Шаверма, бургер, морс..."
+            >
+        </div>
+        <div>
+            <label>Группа</label>
+            <select name="group_id">
+                <option value="">Все группы</option>
+                {% for group in result.groups %}
+                <option
+                    value="{{ group.group_id }}"
+                    {{ "selected" if group_id == group.group_id|string else "" }}
+                >
+                    {{ group.group_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="menu-filter-actions">
+            <button type="submit">Показать</button>
+            <a class="button-link secondary-link" href="/menu">Сбросить</a>
+        </div>
+    </form>
+</section>
+
+<section class="kpi-grid menu-kpis">
+    <article class="kpi-card">
+        <div class="kpi-label">Позиций в меню</div>
+        <div class="kpi-value">{{ result.summary.menu_items_count }}</div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Продавались в период</div>
+        <div class="kpi-value">{{ result.summary.sold_items_count }}</div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Продано единиц</div>
+        <div class="kpi-value">
+            {{ "{:,.0f}".format(result.summary.sold_quantity).replace(",", " ") }}
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Выручка меню</div>
+        <div class="kpi-value">
+            {{ "{:,.0f}".format(result.summary.revenue).replace(",", " ") }} ₽
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ПОЗИЦИИ</div>
+            <h2>Каталог меню</h2>
+        </div>
+        <div class="period-caption">
+            Найдено: {{ result["items"]|length }}
+        </div>
+    </div>
+
+    {% if result["items"] %}
+    <div class="menu-grid">
+        {% for item in result["items"] %}
+        <article class="menu-card">
+            <div class="menu-card-head">
+                <div>
+                    <div class="menu-group">{{ item.group_name }}</div>
+                    <h3>{{ item.item_name }}</h3>
+                </div>
+                {% if item.is_disabled %}
+                <span class="menu-status disabled">Отключено</span>
+                {% else %}
+                <span class="menu-status active">Активно</span>
+                {% endif %}
+            </div>
+
+            <div class="menu-price">
+                {% if item.current_price is not none %}
+                    {{ "{:,.0f}".format(item.current_price).replace(",", " ") }} ₽
+                {% else %}
+                    Цена не указана
+                {% endif %}
+            </div>
+
+            <div class="menu-stats">
+                <div>
+                    <span>Продано</span>
+                    <strong>
+                        {{ "{:,.0f}".format(item.sold_quantity).replace(",", " ") }}
+                    </strong>
+                </div>
+                <div>
+                    <span>Чеков</span>
+                    <strong>{{ item.checks_count }}</strong>
+                </div>
+                <div>
+                    <span>Выручка</span>
+                    <strong>
+                        {{ "{:,.0f}".format(item.revenue).replace(",", " ") }} ₽
+                    </strong>
+                </div>
+            </div>
+
+            {% if item.article %}
+            <div class="menu-article">
+                Артикул: {{ item.article }}
+            </div>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">Позиции не найдены.</p>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

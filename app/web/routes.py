@@ -9,6 +9,10 @@ from app.services.dashboard_service import DashboardService
 from app.services.explorer_service import ExplorerService
 from app.services.schema_map_service import SchemaMapService
 from app.services.sales_service import SalesService
+from app.services.menu_service import MenuService
+from app.services.finance_service import FinanceService
+from app.services.operations_service import OperationsService
+from app.services.bi_service import BIService
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/web/templates")
@@ -16,10 +20,21 @@ templates = Jinja2Templates(directory="app/web/templates")
 
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request):
+    result = None
+    error = None
+
+    try:
+        result = OperationsService().load()
+    except SqlServerError as exc:
+        error = str(exc)
+
     return templates.TemplateResponse(
         request=request,
-        name="home.html",
-        context={},
+        name="operations_dashboard.html",
+        context={
+            "result": result,
+            "error": error,
+        },
     )
 
 
@@ -168,9 +183,90 @@ def sales_dashboard(
     )
 
 
+@router.get("/menu", response_class=HTMLResponse)
+def menu_dashboard(
+    request: Request,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    search: str = "",
+    group_id: str = "",
+):
+    result = None
+    error = None
+
+    try:
+        result = MenuService().load(
+            date_from,
+            date_to,
+            search,
+            group_id,
+        )
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="menu_dashboard.html",
+        context={
+            "result": result,
+            "error": error,
+            "search": search,
+            "group_id": group_id,
+        },
+    )
+
+
+@router.get("/finance", response_class=HTMLResponse)
+def finance_dashboard(
+    request: Request,
+    date_from: date | None = None,
+    date_to: date | None = None,
+):
+    result = None
+    error = None
+
+    try:
+        result = FinanceService().load(date_from, date_to)
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="finance_dashboard.html",
+        context={
+            "result": result,
+            "error": error,
+        },
+    )
+
+
+@router.get("/bi", response_class=HTMLResponse)
+def bi_dashboard(
+    request: Request,
+    date_from: date | None = None,
+    date_to: date | None = None,
+):
+    result = None
+    error = None
+
+    try:
+        result = BIService().load(date_from, date_to)
+    except SqlServerError as exc:
+        error = str(exc)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bi_dashboard.html",
+        context={
+            "result": result,
+            "error": error,
+        },
+    )
+
+
 @router.get("/health")
 def health():
     return {
         "status": "ok",
-        "version": "1.3.1",
+        "version": "2.0.0",
     }

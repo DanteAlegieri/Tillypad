@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% block title %}Финансы — Гастродом №3{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div>
+        <div class="eyebrow">КАССА</div>
+        <h1>Финансы</h1>
+        <p>Разбивка оплат по способам и динамика поступлений.</p>
+    </div>
+</section>
+
+{% if error %}
+<div class="alert error">{{ error }}</div>
+{% endif %}
+
+{% if result %}
+<section class="panel filter-panel">
+    <form method="get" class="period-form">
+        <div>
+            <label>Дата с</label>
+            <input
+                type="date"
+                name="date_from"
+                value="{{ result.summary.date_from }}"
+            >
+        </div>
+        <div>
+            <label>Дата по</label>
+            <input
+                type="date"
+                name="date_to"
+                value="{{ result.summary.date_to }}"
+            >
+        </div>
+        <div class="period-actions">
+            <button type="submit">Показать</button>
+            <a class="button-link secondary-link" href="/finance">
+                Сегодня
+            </a>
+        </div>
+    </form>
+</section>
+
+<section class="kpi-grid finance-kpis">
+    <article class="kpi-card">
+        <div class="kpi-label">Оплачено</div>
+        <div class="kpi-value">
+            {{ "{:,.2f}".format(result.summary.total_amount).replace(",", " ") }} ₽
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Наличные</div>
+        <div class="kpi-value">
+            {{ "{:,.2f}".format(result.summary.cash_amount).replace(",", " ") }} ₽
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Безналичные</div>
+        <div class="kpi-value">
+            {{ "{:,.2f}".format(result.summary.cashless_amount).replace(",", " ") }} ₽
+        </div>
+    </article>
+    <article class="kpi-card">
+        <div class="kpi-label">Средний оплаченный чек</div>
+        <div class="kpi-value">
+            {{ "{:,.2f}".format(result.summary.avg_check).replace(",", " ") }} ₽
+        </div>
+    </article>
+</section>
+
+<div class="alert warning">
+    Возвраты пока определяются только по отрицательной
+    <span class="mono">chpy_Sum</span>.
+    Значение <span class="mono">chpy_chpc_ID</span> показано в таблице,
+    но его справочник ещё не расшифрован.
+</div>
+
+<section class="analytics-grid finance-grid">
+    <article class="panel chart-panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">СТРУКТУРА</div>
+                <h2>Способы оплаты</h2>
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="payTypeChart"></canvas>
+        </div>
+    </article>
+
+    <article class="panel top-panel">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">ДЕТАЛИ</div>
+                <h2>Оплата по видам</h2>
+            </div>
+        </div>
+        {% if result.pay_types %}
+        <div class="payment-cards">
+            {% for row in result.pay_types %}
+            <article class="payment-card">
+                <div class="payment-card-head">
+                    <div class="payment-card-title">
+                        <strong>{{ row.pay_type_name }}</strong>
+                        <span>
+                            {{ "Наличные" if row.is_cash else "Безналичные" }}
+                            · {{ row.checks_count }} чек.
+                        </span>
+                    </div>
+                    <div class="payment-card-amount">
+                        {{ "{:,.2f}".format(row.amount).replace(",", " ") }} ₽
+                    </div>
+                </div>
+
+                <div class="payment-progress">
+                    <div
+                        class="payment-progress-fill"
+                        style="width: {{ row.share }}%"
+                    ></div>
+                </div>
+
+                <div class="payment-card-footer">
+                    <span>{{ row.share }}% от всех оплат</span>
+                    <span>
+                        Средняя оплата:
+                        {{ "{:,.2f}".format(row.avg_payment).replace(",", " ") }} ₽
+                    </span>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Оплат за период нет.</p>
+        {% endif %}
+    </article>
+
+    <article class="panel chart-panel wide">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">ДИНАМИКА</div>
+                <h2>Оплаты по дням</h2>
+            </div>
+        </div>
+        <div class="chart-wrap large">
+            <canvas id="dailyPaymentsChart"></canvas>
+        </div>
+    </article>
+
+    <article class="panel chart-panel wide">
+        <div class="panel-title-row">
+            <div>
+                <div class="eyebrow">НАГРУЗКА</div>
+                <h2>Оплаты по часам</h2>
+            </div>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="hourlyPaymentsChart"></canvas>
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-title-row">
+        <div>
+            <div class="eyebrow">ОПЕРАЦИИ</div>
+            <h2>Последние платежи</h2>
+        </div>
+        <div class="period-caption">
+            Строк оплат: {{ result.summary.payment_rows }}
+        </div>
+    </div>
+
+    {% if result.recent %}
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Чек</th>
+                    <th>Способ</th>
+                    <th>Тип</th>
+                    <th>Код операции</th>
+                    <th>Сумма</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in result.recent %}
+                <tr>
+                    <td>{{ row.check_date }}</td>
+                    <td>{{ row.check_name }}</td>
+                    <td><strong>{{ row.pay_type_name }}</strong></td>
+                    <td>{{ "Наличные" if row.is_cash else "Безналичные" }}</td>
+                    <td class="mono">{{ row.operation_code }}</td>
+                    <td class="{{ 'negative-money' if row.amount < 0 else '' }}">
+                        <strong>
+                            {{ "{:,.2f}".format(row.amount).replace(",", " ") }} ₽
+                        </strong>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="muted">Платежей за период нет.</p>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+const money = value =>
+    new Intl.NumberFormat('ru-RU').format(value) + ' ₽';
+
+const payTypeLabels = {{ result.pay_types | map(attribute='pay_type_name') | list | tojson }};
+const payTypeAmounts = {{ result.pay_types | map(attribute='amount') | list | tojson }};
+
+const palette = [
+    '#a53124',
+    '#6e625b',
+    '#d28b35',
+    '#4d7c63',
+    '#8a6fa8',
+    '#477b9d',
+    '#b65b75',
+    '#81734d'
+];
+
+new Chart(document.getElementById('payTypeChart'), {
+    type: 'doughnut',
+    data: {
+        labels: payTypeLabels,
+        datasets: [{
+            data: payTypeAmounts,
+            backgroundColor: palette,
+            borderWidth: 0,
+            hoverOffset: 7
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '66%',
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { usePointStyle: true, boxWidth: 10, padding: 16 }
+            },
+            tooltip: {
+                callbacks: {
+                    label: context =>
+                        context.label + ': ' + money(context.parsed)
+                }
+            }
+        }
+    }
+});
+
+const dailyLabels = {{ result.daily | map(attribute='payment_date') | list | tojson }};
+const dailyCash = {{ result.daily | map(attribute='cash_amount') | list | tojson }};
+const dailyCashless = {{ result.daily | map(attribute='cashless_amount') | list | tojson }};
+
+new Chart(document.getElementById('dailyPaymentsChart'), {
+    type: 'bar',
+    data: {
+        labels: dailyLabels,
+        datasets: [{
+            label: 'Наличные',
+            data: dailyCash,
+            backgroundColor: '#d28b35',
+            borderRadius: 7
+        }, {
+            label: 'Безналичные',
+            data: dailyCashless,
+            backgroundColor: '#a53124',
+            borderRadius: 7
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+                callbacks: {
+                    label: context =>
+                        context.dataset.label + ': ' + money(context.parsed.y)
+                }
+            }
+        },
+        scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: {
+                stacked: true,
+                beginAtZero: true,
+                ticks: { callback: value => money(value) }
+            }
+        }
+    }
+});
+
+const hourlyLabels = {{ result.hourly | map(attribute='payment_hour') | list | tojson }}.map(
+    hour => String(hour).padStart(2, '0') + ':00'
+);
+const hourlyAmounts = {{ result.hourly | map(attribute='amount') | list | tojson }};
+
+new Chart(document.getElementById('hourlyPaymentsChart'), {
+    type: 'line',
+    data: {
+        labels: hourlyLabels,
+        datasets: [{
+            label: 'Оплаты',
+            data: hourlyAmounts,
+            borderColor: '#a53124',
+            backgroundColor: 'rgba(165,49,36,.12)',
+            fill: true,
+            tension: .35,
+            pointRadius: 4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: context => money(context.parsed.y)
+                }
+            }
+        },
+        scales: {
+            x: { grid: { display: false } },
+            y: {
+                beginAtZero: true,
+                ticks: { callback: value => money(value) }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

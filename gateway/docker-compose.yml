@@ -1,0 +1,13 @@
+services:
+  gateway:
+    build: .
+    container_name: restaurant-gateway
+    restart: unless-stopped
+    ports:
+      - "8020:8020"
+    environment:
+      GATEWAY_ADMIN_TOKEN: ${GATEWAY_ADMIN_TOKEN}
+      GATEWAY_DB_PATH: /app/data/gateway.db
+      GATEWAY_REQUEST_TIMEOUT: 30
+    volumes:
+      - ./data:/app/data

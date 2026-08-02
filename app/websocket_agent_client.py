@@ -15,7 +15,10 @@ import websockets
 
 from app.db.sql_server import SqlServer
 from app.query_registry import QueryRegistry, QueryRegistryError
+from app.query_cache import QueryCache
+from app.payload_codec import encode_payload
 from app.websocket_protocol import GatewayMessage
+from app.agent_state import get_runtime_state, utc_now
 
 
 LOGGER = logging.getLogger("gastrodom.websocket_agent")
@@ -44,18 +47,59 @@ class WebSocketAgentClient:
 
         self.database = SqlServer()
         self.registry = QueryRegistry()
+        self.cache = QueryCache(
+            default_ttl_seconds=int(
+                os.environ.get("TILLYPAD_QUERY_CACHE_TTL", "45")
+            ),
+            max_entries=int(
+                os.environ.get("TILLYPAD_QUERY_CACHE_MAX", "256")
+            ),
+        )
+        self.compress_threshold_bytes = int(
+            os.environ.get(
+                "TILLYPAD_WS_COMPRESS_THRESHOLD",
+                str(64 * 1024),
+            )
+        )
         self.last_query_at: str | None = None
+        self.state = get_runtime_state()
+        self.state.update(
+            version="17.0.0",
+            agent_id=self.agent_id,
+            gateway_url=self.gateway_url,
+            service_status="running",
+            gateway_status="disconnected",
+            sql_status="configured",
+        )
 
     async def run_forever(self) -> None:
         delay = 2
+        attempt = 0
 
         while True:
+            attempt += 1
+            self.state.update(
+                gateway_status="connecting",
+                reconnect_attempt=attempt,
+            )
             try:
                 await self._run_session()
                 delay = 2
+                attempt = 0
             except asyncio.CancelledError:
+                self.state.update(
+                    service_status="stopping",
+                    gateway_status="disconnected",
+                )
                 raise
             except Exception as exc:
+                error_text = f"{type(exc).__name__}: {exc}"
+                self.state.update(
+                    gateway_status="disconnected",
+                    last_disconnected_at=utc_now(),
+                    last_error=error_text,
+                    reconnect_attempt=attempt,
+                )
                 LOGGER.exception(
                     "WebSocket-сессия завершилась с ошибкой: %s",
                     exc,
@@ -73,10 +117,23 @@ class WebSocketAgentClient:
         async with websockets.connect(
             self.gateway_url,
             additional_headers=headers,
-            ping_interval=None,
+            ping_interval=20,
+            ping_timeout=20,
             close_timeout=10,
+            open_timeout=15,
             max_size=16 * 1024 * 1024,
         ) as websocket:
+            self.state.update(
+                gateway_status="connected",
+                last_connected_at=utc_now(),
+                last_error=None,
+                reconnect_attempt=0,
+            )
+            LOGGER.info(
+                "WebSocket подключён: %s, agent_id=%s",
+                self.gateway_url,
+                self.agent_id,
+            )
             await self._send_hello(websocket)
 
             heartbeat_task = asyncio.create_task(
@@ -86,6 +143,10 @@ class WebSocketAgentClient:
                 async for raw_message in websocket:
                     await self._handle_message(websocket, raw_message)
             finally:
+                self.state.update(
+                    gateway_status="disconnected",
+                    last_disconnected_at=utc_now(),
+                )
                 heartbeat_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await heartbeat_task
@@ -95,7 +156,7 @@ class WebSocketAgentClient:
             type="agent_hello",
             agent_id=self.agent_id,
             payload={
-                "agent_version": "15.2.0",
+                "agent_version": "17.0.0",
                 "hostname": platform.node(),
                 "database_name": os.environ.get(
                     "TILLYPAD_SQL_DATABASE",
@@ -103,9 +164,13 @@ class WebSocketAgentClient:
                 ),
                 "capabilities": [
                     "named_queries",
+                    "query_cache",
+                    "gzip_results",
+                    "cache_control",
                     "heartbeat",
                     "automatic_reconnect",
                 ],
+                "allowed_queries": self.registry.names(),
             },
         )
         await websocket.send(message.model_dump_json())
@@ -119,10 +184,17 @@ class WebSocketAgentClient:
                 payload={
                     "status": "online",
                     "queue_size": 0,
+                    "cache_entries": self.cache.size(),
                     "last_query_at": self.last_query_at,
                 },
             )
             await websocket.send(message.model_dump_json())
+            self.state.update(
+                last_heartbeat_at=utc_now(),
+                gateway_status="connected",
+                cache_entries=self.cache.size(),
+            )
+            self._consume_local_commands()
 
     async def _handle_message(
         self,
@@ -131,25 +203,75 @@ class WebSocketAgentClient:
     ) -> None:
         message = GatewayMessage.model_validate_json(raw_message)
 
+        if message.type == "cache_clear":
+            removed = self.cache.clear()
+            response = GatewayMessage(
+                type="control_result",
+                request_id=message.request_id,
+                agent_id=self.agent_id,
+                payload={
+                    "success": True,
+                    "command": "cache_clear",
+                    "removed_entries": removed,
+                },
+            )
+            await websocket.send(response.model_dump_json())
+            return
+
+        if message.type == "capabilities_request":
+            response = GatewayMessage(
+                type="capabilities_result",
+                request_id=message.request_id,
+                agent_id=self.agent_id,
+                payload={
+                    "success": True,
+                    "allowed_queries": self.registry.names(),
+                    "capabilities": [
+                        "named_queries",
+                        "query_cache",
+                        "gzip_results",
+                        "cache_control",
+                    ],
+                },
+            )
+            await websocket.send(response.model_dump_json())
+            return
+
         if message.type != "query_request":
             return
 
         query_name = str(message.payload.get("query_name") or "")
         parameters = dict(message.payload.get("parameters") or {})
+        bypass_cache = bool(message.payload.get("bypass_cache", False))
+        requested_ttl = message.payload.get("cache_ttl_seconds")
+        cache_key = self.cache.build_key(query_name, parameters)
 
         try:
-            sql, args = self.registry.build(query_name, parameters)
-            result = await asyncio.to_thread(
-                self._execute_query,
-                sql,
-                args,
-            )
-            payload = {
-                "success": True,
-                **result,
-                "error": None,
-                "from_cache": False,
-            }
+            cached = None if bypass_cache else self.cache.get(cache_key)
+            if cached is not None:
+                payload = {
+                    **cached,
+                    "from_cache": True,
+                }
+            else:
+                sql, args = self.registry.build(query_name, parameters)
+                result = await asyncio.to_thread(
+                    self._execute_query,
+                    sql,
+                    args,
+                )
+                payload = {
+                    "success": True,
+                    **result,
+                    "error": None,
+                    "from_cache": False,
+                }
+                ttl = (
+                    int(requested_ttl)
+                    if requested_ttl is not None
+                    else None
+                )
+                self.cache.set(cache_key, payload, ttl)
         except QueryRegistryError as exc:
             payload = {
                 "success": False,
@@ -171,14 +293,46 @@ class WebSocketAgentClient:
             }
 
         self.last_query_at = datetime.now(timezone.utc).isoformat()
+        self.state.update(
+            last_query_at=self.last_query_at,
+            cache_entries=self.cache.size(),
+            sql_status=("ok" if payload.get("success") else "error"),
+            last_error=(
+                None if payload.get("success")
+                else str(payload.get("error") or "SQL query failed")
+            ),
+        )
 
         response = GatewayMessage(
             type="query_result",
             request_id=message.request_id,
             agent_id=self.agent_id,
-            payload=payload,
+            payload=encode_payload(
+                payload,
+                threshold_bytes=self.compress_threshold_bytes,
+            ),
         )
         await websocket.send(response.model_dump_json())
+
+    def _consume_local_commands(self) -> None:
+        data_dir = Path(
+            os.environ.get(
+                "RESTAURANTOS_DATA_DIR",
+                os.getcwd(),
+            )
+        )
+        marker = data_dir / "clear_cache.request"
+        if marker.exists():
+            removed = self.cache.clear()
+            try:
+                marker.unlink()
+            except OSError:
+                pass
+            self.state.update(cache_entries=0)
+            LOGGER.info(
+                "Локальная команда: кэш очищен, удалено %s записей",
+                removed,
+            )
 
     def _execute_query(
         self,

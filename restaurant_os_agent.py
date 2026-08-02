@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import ctypes
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -30,10 +31,24 @@ from app.agent_diagnostics import (
     run_all,
 )
 from app.websocket_agent_client import WebSocketAgentClient
+from app.sql_autodetect import (
+    find_tillypad,
+    installed_odbc_drivers,
+)
+from app.local_agent_web import LocalAgentWebServer
+from app.agent_state import get_runtime_state
+from app.service_manager import (
+    install_service,
+    query_service,
+    remove_service,
+    restart_service,
+    start_service,
+    stop_service,
+)
 
 
 APP_NAME = "Restaurant OS Agent"
-VERSION = "15.6.0"
+VERSION = "17.0.0"
 SERVICE_NAME = "RestaurantOSAgent"
 SERVICE_DISPLAY_NAME = "Restaurant OS Agent"
 
@@ -60,11 +75,16 @@ DEFAULTS = {
         "restaurant-main",
     ).lower(),
     "TILLYPAD_WS_GATEWAY_URL": (
-        "wss://gateway.example.ru/ws/agent"
+        "ws://127.0.0.1:8020/ws/agent"
     ),
     "TILLYPAD_WS_API_KEY": "",
     "TILLYPAD_WS_HEARTBEAT": "20",
     "TILLYPAD_WS_RECONNECT_MAX": "60",
+    "TILLYPAD_QUERY_CACHE_TTL": "45",
+    "TILLYPAD_QUERY_CACHE_MAX": "256",
+    "TILLYPAD_WS_COMPRESS_THRESHOLD": "65536",
+    "RESTAURANTOS_LOCAL_WEB_HOST": "127.0.0.1",
+    "RESTAURANTOS_LOCAL_WEB_PORT": "8090",
 }
 
 
@@ -87,11 +107,37 @@ def configure_environment() -> None:
     (DATA_DIR / "cache").mkdir(exist_ok=True)
 
     os.environ["GASTRODOM_ENV_FILE"] = str(ENV_FILE)
+    os.environ["RESTAURANTOS_DATA_DIR"] = str(DATA_DIR)
     os.environ.setdefault(
         "TILLYPAD_RELAY_CACHE_DIR",
         str(DATA_DIR / "cache"),
     )
     os.chdir(DATA_DIR)
+
+
+def configure_logging() -> None:
+    log_dir = DATA_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "agent.log"
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    if not any(
+        isinstance(handler, logging.FileHandler)
+        for handler in root.handlers
+    ):
+        handler = logging.FileHandler(
+            log_path,
+            encoding="utf-8",
+        )
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s | %(levelname)s | "
+                "%(name)s | %(message)s"
+            )
+        )
+        root.addHandler(handler)
 
 
 def is_admin() -> bool:
@@ -183,6 +229,7 @@ class RestaurantOSAgentService(
         self.loop: asyncio.AbstractEventLoop | None = None
         self.task: asyncio.Task | None = None
         self.thread: threading.Thread | None = None
+        self.web_server: LocalAgentWebServer | None = None
         socket.setdefaulttimeout(60)
 
     def SvcStop(self):
@@ -195,6 +242,25 @@ class RestaurantOSAgentService(
 
     def SvcDoRun(self):
         configure_environment()
+        configure_logging()
+        state = get_runtime_state()
+        state.update(
+            version=VERSION,
+            service_status="running",
+        )
+        self.web_server = LocalAgentWebServer(
+            host=os.environ.get(
+                "RESTAURANTOS_LOCAL_WEB_HOST",
+                "127.0.0.1",
+            ),
+            port=int(
+                os.environ.get(
+                    "RESTAURANTOS_LOCAL_WEB_PORT",
+                    "8090",
+                )
+            ),
+        )
+        self.web_server.start()
         servicemanager.LogInfoMsg(
             f"{SERVICE_NAME}: запуск v{VERSION}"
         )
@@ -215,6 +281,12 @@ class RestaurantOSAgentService(
             self.loop.call_soon_threadsafe(self.task.cancel)
         if self.thread is not None:
             self.thread.join(timeout=30)
+        if self.web_server is not None:
+            self.web_server.stop()
+        get_runtime_state().update(
+            service_status="stopped",
+            gateway_status="disconnected",
+        )
 
     def _run_agent(self):
         self.loop = asyncio.new_event_loop()
@@ -236,99 +308,6 @@ def run_service_dispatcher() -> None:
         RestaurantOSAgentService
     )
     servicemanager.StartServiceCtrlDispatcher()
-
-
-def _open_service_manager(access: int):
-    return win32service.OpenSCManager(None, None, access)
-
-
-def _stop_and_delete_existing_service() -> None:
-    manager = _open_service_manager(win32service.SC_MANAGER_CONNECT)
-    try:
-        try:
-            service = win32service.OpenService(
-                manager,
-                SERVICE_NAME,
-                win32service.SERVICE_STOP | win32service.DELETE | win32service.SERVICE_QUERY_STATUS,
-            )
-        except pywintypes.error as exc:
-            if exc.winerror == 1060:
-                return
-            raise
-        try:
-            try:
-                status = win32service.QueryServiceStatus(service)
-                if status[1] != win32service.SERVICE_STOPPED:
-                    try:
-                        win32service.ControlService(service, win32service.SERVICE_CONTROL_STOP)
-                    except pywintypes.error as exc:
-                        if exc.winerror not in (1062, 1052):
-                            raise
-                    deadline = time.time() + 15
-                    while time.time() < deadline:
-                        if win32service.QueryServiceStatus(service)[1] == win32service.SERVICE_STOPPED:
-                            break
-                        time.sleep(0.5)
-            finally:
-                win32service.DeleteService(service)
-        finally:
-            win32service.CloseServiceHandle(service)
-    finally:
-        win32service.CloseServiceHandle(manager)
-    time.sleep(1)
-
-
-def register_service() -> None:
-    if not is_admin():
-        raise PermissionError("Для регистрации службы нужны права администратора.")
-    _stop_and_delete_existing_service()
-    manager = _open_service_manager(win32service.SC_MANAGER_CREATE_SERVICE)
-    service = None
-    try:
-        binary_path = f'"{INSTALLED_EXE}" --run-service'
-        service = win32service.CreateService(
-            manager,
-            SERVICE_NAME,
-            SERVICE_DISPLAY_NAME,
-            win32service.SERVICE_ALL_ACCESS,
-            win32service.SERVICE_WIN32_OWN_PROCESS,
-            win32service.SERVICE_AUTO_START,
-            win32service.SERVICE_ERROR_NORMAL,
-            binary_path,
-            None,
-            0,
-            None,
-            None,
-            None,
-        )
-        win32service.ChangeServiceConfig2(
-            service,
-            win32service.SERVICE_CONFIG_DESCRIPTION,
-            "Безопасное исходящее WebSocket-подключение TillyPad к Restaurant OS.",
-        )
-        win32service.ChangeServiceConfig2(
-            service,
-            win32service.SERVICE_CONFIG_FAILURE_ACTIONS,
-            {
-                "ResetPeriod": 86400,
-                "RebootMsg": "",
-                "Command": "",
-                "Actions": [
-                    (win32service.SC_ACTION_RESTART, 5000),
-                    (win32service.SC_ACTION_RESTART, 15000),
-                    (win32service.SC_ACTION_RESTART, 60000),
-                ],
-            },
-        )
-        try:
-            win32service.ChangeServiceConfig2(service, win32service.SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, True)
-        except (AttributeError, pywintypes.error):
-            pass
-        win32service.StartService(service, None)
-    finally:
-        if service is not None:
-            win32service.CloseServiceHandle(service)
-        win32service.CloseServiceHandle(manager)
 
 
 def grant_data_permissions() -> None:
@@ -369,6 +348,70 @@ def grant_data_permissions() -> None:
                 + (result.stdout + result.stderr)
             )
 
+def replace_installed_executable(
+    source: Path,
+    destination: Path,
+    attempts: int = 20,
+    delay_seconds: float = 0.5,
+) -> None:
+    """
+    Windows may keep the previous service executable locked briefly
+    after stopping/deleting the service. Retry replacement until the
+    Service Control Manager and antivirus release the file.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(".new.exe")
+    backup = destination.with_suffix(".old.exe")
+
+    for path in (temporary, backup):
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError:
+            pass
+
+    shutil.copy2(source, temporary)
+
+    last_error: Exception | None = None
+    for _ in range(attempts):
+        try:
+            if destination.exists():
+                try:
+                    os.replace(destination, backup)
+                except FileNotFoundError:
+                    pass
+
+            os.replace(temporary, destination)
+
+            try:
+                if backup.exists():
+                    backup.unlink()
+            except OSError:
+                # Backup is harmless and can be removed on next update.
+                pass
+            return
+
+        except PermissionError as exc:
+            last_error = exc
+        except OSError as exc:
+            last_error = exc
+
+        time.sleep(delay_seconds)
+
+    try:
+        if temporary.exists():
+            temporary.unlink()
+    except OSError:
+        pass
+
+    raise RuntimeError(
+        "Не удалось заменить установленный RestaurantOSAgent.exe.\n\n"
+        "Старый процесс или антивирус продолжает удерживать файл.\n"
+        "Закройте панель агента и повторите установку.\n\n"
+        f"Техническая ошибка: {last_error}"
+    )
+
+
 def install_files() -> None:
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -380,8 +423,15 @@ def install_files() -> None:
     current_exe = Path(sys.executable).resolve()
     installed_resolved = INSTALLED_EXE.resolve()
 
+    # Критически важно: старая служба должна быть остановлена до
+    # замены файла, иначе Windows возвращает WinError 32.
+    remove_service(SERVICE_NAME)
+
     if current_exe != installed_resolved:
-        shutil.copy2(current_exe, INSTALLED_EXE)
+        replace_installed_executable(
+            current_exe,
+            INSTALLED_EXE,
+        )
 
     run_hidden(
         ["attrib", "+h", str(DATA_DIR)],
@@ -389,7 +439,15 @@ def install_files() -> None:
     )
     grant_data_permissions()
 
-    register_service()
+    install_service(
+        service_name=SERVICE_NAME,
+        display_name=SERVICE_DISPLAY_NAME,
+        description=(
+            "Безопасное исходящее WebSocket-подключение "
+            "TillyPad к Restaurant OS."
+        ),
+        executable_path=INSTALLED_EXE,
+    )
 
 
 def uninstall_agent() -> None:
@@ -397,7 +455,7 @@ def uninstall_agent() -> None:
         relaunch_as_admin(["--uninstall"])
         return
     try:
-        _stop_and_delete_existing_service()
+        remove_service(SERVICE_NAME)
 
         # Старый каталог предыдущих версий больше не используется.
         legacy_dir = Path(
@@ -508,7 +566,7 @@ class SetupWindow(tk.Tk):
             self.stage(15, "Подготовка каталогов...")
             configure_environment()
 
-            self.stage(35, "Копирование приложения...")
+            self.stage(35, "Остановка старой службы и обновление приложения...")
             install_files()
 
             self.stage(80, "Проверка запуска службы Windows...")
@@ -606,12 +664,22 @@ class ConfigWindow(tk.Tk):
                 else ""
             )
 
-            ttk.Entry(
-                settings,
-                textvariable=var,
-                show=show,
-                width=68,
-            ).grid(
+            if key == "TILLYPAD_SQL_DRIVER":
+                widget = ttk.Combobox(
+                    settings,
+                    textvariable=var,
+                    values=installed_odbc_drivers(),
+                    width=66,
+                )
+            else:
+                widget = ttk.Entry(
+                    settings,
+                    textvariable=var,
+                    show=show,
+                    width=68,
+                )
+
+            widget.grid(
                 row=row,
                 column=1,
                 sticky="ew",
@@ -646,6 +714,12 @@ class ConfigWindow(tk.Tk):
             text="Сохранить и проверить",
             command=self.run_diagnostics,
         ).pack(side="left")
+
+        ttk.Button(
+            controls,
+            text="Найти TillyPad автоматически",
+            command=self.autodetect_tillypad,
+        ).pack(side="left", padx=8)
 
         self.tree = ttk.Treeview(
             diagnostics,
@@ -751,6 +825,103 @@ class ConfigWindow(tk.Tk):
             "TILLYPAD_WS_API_KEY"
         ].set(secrets.token_urlsafe(48))
 
+    def autodetect_tillypad(self):
+        user = self.variables[
+            "TILLYPAD_SQL_USER"
+        ].get().strip()
+        password = self.variables[
+            "TILLYPAD_SQL_PASSWORD"
+        ].get()
+
+        if not user or not password:
+            messagebox.showwarning(
+                APP_NAME,
+                (
+                    "Сначала укажите SQL-логин и пароль.\n\n"
+                    "Автопоиск не может подключаться к SQL "
+                    "без учётных данных."
+                ),
+            )
+            return
+
+        self.status.set(
+            "Идёт поиск локального SQL Server и базы TillyPad..."
+        )
+        threading.Thread(
+            target=self._autodetect_worker,
+            args=(user, password),
+            daemon=True,
+        ).start()
+
+    def _autodetect_worker(self, user: str, password: str):
+        def progress(message: str):
+            self.after(
+                0,
+                lambda value=message: self.status.set(value),
+            )
+
+        try:
+            results = find_tillypad(
+                user=user,
+                password=password,
+                progress=progress,
+            )
+        except Exception as exc:
+            self.after(
+                0,
+                lambda: messagebox.showerror(
+                    APP_NAME,
+                    f"Автопоиск не выполнен:\n{exc}",
+                ),
+            )
+            return
+
+        self.after(
+            0,
+            lambda: self._apply_autodetect_results(results),
+        )
+
+    def _apply_autodetect_results(self, results):
+        if not results:
+            self.status.set("База TillyPad не найдена")
+            messagebox.showwarning(
+                APP_NAME,
+                (
+                    "Не удалось автоматически найти базу TillyPad.\n\n"
+                    "Проверьте SQL-логин, пароль, состояние службы "
+                    "SQL Server и доступность TCP/IP."
+                ),
+            )
+            return
+
+        best = results[0]
+        self.variables["TILLYPAD_SQL_SERVER"].set(
+            best.server
+        )
+        self.variables["TILLYPAD_SQL_PORT"].set(
+            best.port
+        )
+        self.variables["TILLYPAD_SQL_DATABASE"].set(
+            best.database
+        )
+        self.variables["TILLYPAD_SQL_DRIVER"].set(
+            best.driver
+        )
+
+        self.status.set(
+            f"Найдена база {best.database} на {best.server}"
+        )
+        messagebox.showinfo(
+            APP_NAME,
+            (
+                "TillyPad найден автоматически.\n\n"
+                f"Сервер: {best.server}\n"
+                f"База: {best.database}\n"
+                f"Драйвер: {best.driver}\n\n"
+                f"{best.details}"
+            ),
+        )
+
     def run_diagnostics(self):
         self.save(show_message=False)
         self.status.set("Выполняется диагностика...")
@@ -813,38 +984,25 @@ class ConfigWindow(tk.Tk):
         )
 
     def refresh_service(self):
-        result = run_hidden(
-            ["sc.exe", "query", SERVICE_NAME],
-            check=False,
-        )
-        text = (result.stdout + result.stderr).upper()
-
-        if "RUNNING" in text:
-            value = "Служба запущена"
-        elif "STOPPED" in text:
-            value = "Служба остановлена"
-        else:
-            value = "Служба не установлена"
-
-        self.service_status.set(value)
+        try:
+            state = query_service(SERVICE_NAME)
+            self.service_status.set(state.label)
+        except Exception as exc:
+            self.service_status.set(f"Ошибка службы: {exc}")
 
     def service_action(self, action: str):
-        if action == "restart":
-            run_hidden(
-                ["sc.exe", "stop", SERVICE_NAME],
-                check=False,
+        try:
+            if action == "start":
+                start_service(SERVICE_NAME)
+            elif action == "stop":
+                stop_service(SERVICE_NAME)
+            elif action == "restart":
+                restart_service(SERVICE_NAME)
+        except Exception as exc:
+            messagebox.showerror(
+                APP_NAME,
+                f"Операция со службой не выполнена:\n{exc}",
             )
-            time.sleep(1)
-            run_hidden(
-                ["sc.exe", "start", SERVICE_NAME],
-                check=False,
-            )
-        else:
-            run_hidden(
-                ["sc.exe", action, SERVICE_NAME],
-                check=False,
-            )
-
         self.after(1200, self.refresh_service)
 
 

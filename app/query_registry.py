@@ -25,12 +25,8 @@ class QueryRegistry:
                 f"Параметр {name} должен быть датой YYYY-MM-DD"
             ) from exc
 
-    def build(
-        self,
-        query_name: str,
-        parameters: dict[str, Any],
-    ) -> tuple[str, list[Any]]:
-        handlers = {
+    def handlers(self) -> dict[str, Any]:
+        return {
             "sales_summary": self.sales_summary,
             "sales_hourly": self.sales_hourly,
             "menu_items": self.menu_items,
@@ -39,7 +35,15 @@ class QueryRegistry:
             "health_check": self.health_check,
         }
 
-        handler = handlers.get(query_name)
+    def names(self) -> list[str]:
+        return sorted(self.handlers())
+
+    def build(
+        self,
+        query_name: str,
+        parameters: dict[str, Any],
+    ) -> tuple[str, list[Any]]:
+        handler = self.handlers().get(query_name)
         if handler is None:
             raise QueryRegistryError(
                 f"Запрос '{query_name}' не разрешён"

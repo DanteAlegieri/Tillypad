@@ -793,3 +793,276 @@ SQL Server нельзя публиковать напрямую в интерн�
 - исходный архив содержит установщик службы на Python/pywin32;
 - готовый подписанный Windows MSI/EXE в этой среде не собирался;
 - установщик создаёт локальное изолированное окружение на целевом Windows-компьютере.
+
+
+## v15.2 — WebSocket Gateway
+
+Добавлено:
+
+- постоянное исходящее WebSocket/WSS-соединение агента;
+- автоматическое переподключение с увеличением интервала;
+- heartbeat;
+- регистрация и статус агента;
+- шлюз запросов Restaurant OS → Gateway → Agent;
+- сопоставление ответов по request_id;
+- только разрешённые именованные запросы;
+- отсутствие произвольного SQL по сети;
+- API-ключ;
+- служба Windows для WebSocket Gateway;
+- запросы:
+  - health_check;
+  - sales_summary;
+  - sales_hourly;
+  - menu_items;
+  - delivery_summary;
+  - basket_pairs.
+
+Важно:
+
+- для публичной сети использовать только `wss://`;
+- TLS должен завершаться на reverse proxy либо на защищённом туннеле;
+- агент сам инициирует соединение, поэтому входящий порт на TillyPad ПК не нужен;
+- текущая версия содержит транспорт и шлюз. Полное переключение всех
+  репозиториев Dashboard с HTTP Relay на именованные WebSocket-запросы
+  выполняется следующим этапом.
+
+
+## v15.3 — Professional Agent Installer
+
+Добавлено:
+
+- графический Restaurant OS Agent Manager;
+- настройка SQL, Gateway, Agent ID и API-ключа;
+- генерация безопасного API-ключа;
+- диагностика SQL/Интернета/Gateway;
+- экспорт отчёта для поддержки без секретов;
+- запуск, остановка и перезапуск службы;
+- WebSocket-служба Windows;
+- PyInstaller-сценарий для сборки AgentManager.exe;
+- Inno Setup-сценарий для сборки единого установщика.
+
+Ограничение:
+готовый подписанный SetupAgent.exe не собирался в текущей Linux-среде.
+Архив содержит полностью подготовленные исходники и сценарии сборки на Windows.
+
+
+## v15.3.1 — Исправленный сценарий сборки Windows
+
+Исправлено:
+
+- скрипт автоматически использует `py`, `python` или `python3`;
+- добавлена проверка наличия Python;
+- добавлена попытка восстановления `pip` через `ensurepip`;
+- русская консоль переключается на UTF-8;
+- поддерживаются оба стандартных пути установки Inno Setup;
+- после каждого этапа проверяется код завершения;
+- ошибки содержат понятные инструкции по установке зависимостей.
+
+
+## v15.3.2 — Исправление выбора Python
+
+Исправлена ошибка PowerShell:
+
+- ранее из строки `py` брался первый символ `p`;
+- теперь команда `py`, `python` или `python3` используется целиком;
+- строка `$Python[0]` удалена.
+
+
+## v15.4 — автономный SetupAgent.exe без Inno Setup
+
+Сборка больше не требует Inno Setup.
+
+Сценарий `build_standalone_setup.ps1` создаёт три файла:
+
+1. `AgentManager.exe` — настройка и диагностика;
+2. `AgentService.exe` — скрытая служба Windows;
+3. `RestaurantOS_Agent_Setup_15_4.exe` — единый установщик.
+
+Установщик самостоятельно:
+
+- запрашивает права администратора;
+- создаёт `C:\Program Files\Gastrodom\RelayAgent`;
+- создаёт скрытый защищённый каталог в `ProgramData`;
+- копирует программу;
+- сохраняет существующие настройки при обновлении;
+- регистрирует службу Windows;
+- включает автоматический запуск;
+- включает восстановление после сбоев;
+- запускает службу;
+- открывает Agent Manager.
+
+### Сборка
+
+Запустите:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File "C:\TillypadDashboard\agent_installer\build_standalone_setup.ps1"
+```
+
+Либо двойным щелчком от администратора:
+
+```text
+agent_installer\build_standalone_setup.bat
+```
+
+Результат:
+
+```text
+C:\TillypadDashboard\dist\RestaurantOS_Agent_Setup_15_4.exe
+```
+
+Ограничение: полученный EXE не имеет цифровой подписи издателя.
+Windows SmartScreen может показать предупреждение для нового файла.
+
+
+## v15.5 — единый бинарник RestaurantOSAgent.exe
+
+Теперь сборка создаёт только один передаваемый файл:
+
+```text
+dist\RestaurantOSAgent.exe
+```
+
+Один и тот же файл поддерживает режимы:
+
+```text
+RestaurantOSAgent.exe
+```
+
+Запускает установщик.
+
+```text
+RestaurantOSAgent.exe --config
+```
+
+Открывает панель настроек и диагностики.
+
+```text
+RestaurantOSAgent.exe --run-service
+```
+
+Используется службой Windows.
+
+После установки файл копируется сюда:
+
+```text
+C:\Program Files\RestaurantOS\RestaurantOSAgent.exe
+```
+
+Отдельных `AgentManager.exe`, `AgentService.exe` и Inno Setup больше нет.
+
+### Сборка
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File "C:\TillypadDashboard\agent_installer\build_single_agent.ps1"
+```
+
+Или:
+
+```text
+agent_installer\build_single_agent.bat
+```
+
+Результат:
+
+```text
+C:\TillypadDashboard\dist\RestaurantOSAgent.exe
+```
+
+Файл не подписан цифровой подписью, поэтому SmartScreen может показать предупреждение.
+
+
+## v15.5.1 — регистрация службы через Windows Service API
+
+Исправлена ошибка `Недопустимое поле start=`. Создание, запуск и удаление службы теперь выполняются напрямую через pywin32 (`CreateService`, `StartService`, `DeleteService`) без `sc.exe create`.
+
+
+## v15.5.2 — исправление прав ProgramData
+
+Исправлена ошибка:
+
+```text
+PermissionError: [WinError 5] Отказано в доступе:
+C:\ProgramData\RestaurantOS\logs
+```
+
+Изменения:
+
+- системные каталоги больше не создаются до запроса прав администратора;
+- наследование ACL в `ProgramData\RestaurantOS` не отключается;
+- `SYSTEM` и администраторы получают полный доступ;
+- обычные пользователи получают права изменения конфигурации, кэша и логов;
+- добавлен режим `--repair-permissions` для автоматического восстановления
+  прав после установки v15.5.1;
+- при обнаружении старых строгих прав Agent Manager сам запрашивает
+  повышение прав и исправляет каталог.
+
+Новый файл:
+
+```text
+dist\RestaurantOSAgent_15_5_2.exe
+```
+
+
+## v15.5.3 — универсальные права через SID
+
+Исправлена повторная ошибка доступа:
+
+```text
+[WinError 5] Отказано в доступе:
+C:\ProgramData\RestaurantOS\logs
+```
+
+Причина: имена групп `Users` и `Administrators` зависят от языка Windows.
+
+Теперь используются универсальные SID:
+
+- `S-1-5-18` — SYSTEM;
+- `S-1-5-32-544` — администраторы;
+- `S-1-5-32-545` — обычные пользователи;
+- SID текущего пользователя определяется через Windows API.
+
+Также добавлено:
+
+- `takeown` перед восстановлением старых ACL;
+- проверка результата `icacls`;
+- восстановление прав до создания `logs` и `cache`;
+- исправление папки от предыдущих версий при новой установке;
+- отдельный режим `--repair-permissions`.
+
+Новый файл:
+
+```text
+dist\RestaurantOSAgent_15_5_3.exe
+```
+
+
+## v15.6 — единый каталог без ProgramData
+
+Все файлы агента теперь находятся в одном месте:
+
+```text
+C:\Program Files\RestaurantOS\
+    RestaurantOSAgent.exe
+    data\
+        agent.env
+        logs\
+        cache\
+```
+
+Изменения:
+
+- `C:\ProgramData\RestaurantOS` больше не используется;
+- панель настроек всегда запрашивает права администратора;
+- служба работает от SYSTEM и имеет доступ к данным;
+- устранён конфликт старых ACL в ProgramData;
+- при удалении агент пытается удалить старый каталог ProgramData;
+- установка, служба и настройка остаются в одном EXE.
+
+Новый файл:
+
+```text
+dist\RestaurantOSAgent_15_6_0.exe
+```

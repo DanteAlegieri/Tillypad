@@ -5,6 +5,7 @@ from fastapi import (
     FastAPI,
     Header,
     HTTPException,
+    Query,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -14,14 +15,16 @@ from .config import settings
 from .connections import ConnectionManager
 from .protocol import GatewayMessage
 from .storage import GatewayStorage
+from .owner_dashboard import setup_dashboard_routes
 
 
 app = FastAPI(
     title="Restaurant Gateway",
-    version="1.1.0",
+    version="3.0.0",
 )
 storage = GatewayStorage(settings.database_path)
 connections = ConnectionManager()
+app.include_router(setup_dashboard_routes(storage, connections))
 
 
 class CreateAgentRequest(BaseModel):
@@ -55,7 +58,7 @@ def health() -> dict:
     return {
         "ok": True,
         "service": "restaurant-gateway",
-        "version": "1.1.0",
+        "version": "3.0.0",
         "online_agents": len(connections.connections),
     }
 
@@ -146,6 +149,52 @@ async def clear_agent_cache(agent_id: str) -> dict:
         ) from exc
 
 
+@app.get(
+    "/api/cloud/{agent_id}/sales/latest",
+    dependencies=[Depends(require_admin)],
+)
+def latest_cloud_sales(agent_id: str) -> dict:
+    result = storage.latest_sales_snapshot(agent_id)
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Облачные данные ещё не получены",
+        )
+    return result
+
+
+@app.get(
+    "/api/cloud/{agent_id}/sales/history",
+    dependencies=[Depends(require_admin)],
+)
+def cloud_sales_history(
+    agent_id: str,
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+) -> list[dict]:
+    return storage.sales_history(
+        agent_id,
+        date_from,
+        date_to,
+    )
+
+
+@app.get(
+    "/api/cloud/{agent_id}/menu/history",
+    dependencies=[Depends(require_admin)],
+)
+def cloud_menu_history(
+    agent_id: str,
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+) -> list[dict]:
+    return storage.menu_sales_history(
+        agent_id,
+        date_from,
+        date_to,
+    )
+
+
 @app.websocket("/ws/agent")
 async def websocket_agent(websocket: WebSocket) -> None:
     agent_id = websocket.headers.get("x-agent-id", "").strip()
@@ -213,6 +262,18 @@ async def websocket_agent(websocket: WebSocket) -> None:
                     cache_entries=message.payload.get(
                         "cache_entries"
                     ),
+                )
+
+            elif message.type == "cloud_snapshot":
+                from .payload_codec import decode_payload
+                snapshot = decode_payload(message.payload)
+                storage.save_sales_snapshot(
+                    agent_id,
+                    snapshot,
+                )
+                storage.update_seen(
+                    agent_id,
+                    status="online",
                 )
 
             elif message.type in {

@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from app.agent_state import get_runtime_state
+from app.agent_config import reload_config
 
 
 LOGGER = logging.getLogger("restaurantos.local_web")
@@ -115,9 +116,11 @@ button.secondary{background:#6e625b}
     <table>
       <tr><td>Agent ID</td><td id="agent-id">—</td></tr>
       <tr><td>Gateway URL</td><td id="gateway-url">—</td></tr>
+      <tr><td>Файл настроек</td><td id="config-path">—</td></tr>
       <tr><td>Последнее подключение</td><td id="connected-at">—</td></tr>
       <tr><td>Последний heartbeat</td><td id="heartbeat-at">—</td></tr>
       <tr><td>Последний запрос</td><td id="query-at">—</td></tr>
+      <tr><td>Последняя синхронизация</td><td id="cloud-sync-at">—</td></tr>
       <tr><td>Попытка переподключения</td><td id="reconnect">—</td></tr>
     </table>
   </article>
@@ -127,6 +130,7 @@ button.secondary{background:#6e625b}
     <div class="value" id="error" style="font-size:18px">Нет</div>
     <div class="actions">
       <button onclick="reloadAll()">Обновить</button>
+      <button class="secondary" onclick="reloadConfig()">Перечитать настройки</button>
       <button class="secondary" onclick="clearCache()">Очистить кэш</button>
     </div>
   </article>
@@ -159,9 +163,11 @@ async function loadStatus(){
   document.getElementById('cache').textContent = value(s.cache_entries);
   document.getElementById('agent-id').textContent = value(s.agent_id);
   document.getElementById('gateway-url').textContent = value(s.gateway_url);
+  document.getElementById('config-path').textContent = value(s.config_path);
   document.getElementById('connected-at').textContent = value(s.last_connected_at);
   document.getElementById('heartbeat-at').textContent = value(s.last_heartbeat_at);
   document.getElementById('query-at').textContent = value(s.last_query_at);
+  document.getElementById('cloud-sync-at').textContent = value(s.last_cloud_sync_at);
   document.getElementById('reconnect').textContent = value(s.reconnect_attempt);
   const error = document.getElementById('error');
   error.textContent = value(s.last_error || 'Нет');
@@ -171,6 +177,11 @@ async function loadLogs(){
   const r = await fetch('/api/logs?lines=150', {cache:'no-store'});
   const data = await r.json();
   document.getElementById('logs').textContent = data.text || 'Журнал пока пуст.';
+}
+async function reloadConfig(){
+  await fetch('/api/config/reload', {method:'POST'});
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  await reloadAll();
 }
 async function clearCache(){
   await fetch('/api/cache/clear', {method:'POST'});
@@ -232,7 +243,12 @@ class AgentWebHandler(BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/api/status":
-            self._json(get_runtime_state().snapshot())
+            state = get_runtime_state().snapshot()
+            config = reload_config()
+            state["agent_id"] = config.agent_id
+            state["gateway_url"] = config.gateway_url
+            state["config_path"] = str(config.source_path)
+            self._json(state)
             return
 
         if parsed.path == "/api/logs":
@@ -243,6 +259,28 @@ class AgentWebHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/config/reload":
+            config = reload_config()
+            state = get_runtime_state()
+            state.update(
+                agent_id=config.agent_id,
+                gateway_url=config.gateway_url,
+                last_error=None,
+            )
+            marker = Path(
+                os.environ.get(
+                    "RESTAURANTOS_DATA_DIR",
+                    os.getcwd(),
+                )
+            ) / "reload_config.request"
+            marker.write_text("1", encoding="utf-8")
+            self._json({
+                "ok": True,
+                "agent_id": config.agent_id,
+                "gateway_url": config.gateway_url,
+            })
+            return
+
         if parsed.path == "/api/cache/clear":
             marker = Path(
                 os.environ.get(

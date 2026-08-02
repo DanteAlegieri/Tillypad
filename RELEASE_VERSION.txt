@@ -1,0 +1,4 @@
+Restaurant OS 3.0
+Agent 30.0.0
+Gateway 3.0.0
+BI Dashboard 2.0

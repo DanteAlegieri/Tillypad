@@ -56,7 +56,7 @@ Write-Host "Сборка единого RestaurantOSAgent.exe..." -ForegroundCol
   --onefile `
   --windowed `
   --uac-admin `
-  --name RestaurantOSAgent_17_0_0 `
+  --name RestaurantOSAgent_30_0_0 `
   --hidden-import win32timezone `
   --hidden-import pyodbc `
   --hidden-import websockets `
@@ -72,13 +72,14 @@ Write-Host "Сборка единого RestaurantOSAgent.exe..." -ForegroundCol
   --hidden-import http.server `
   --hidden-import app.local_agent_web `
   --hidden-import app.agent_state `
+  --hidden-import app.agent_config `
   restaurant_os_agent.py
 
 if ($LASTEXITCODE -ne 0) {
     throw "Ошибка сборки RestaurantOSAgent.exe."
 }
 
-$Output = Join-Path $Root "dist\RestaurantOSAgent_17_0_0.exe"
+$Output = Join-Path $Root "dist\RestaurantOSAgent_30_0_0.exe"
 
 Write-Host ""
 Write-Host "Готово!" -ForegroundColor Green

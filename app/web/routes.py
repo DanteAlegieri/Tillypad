@@ -564,5 +564,5 @@ def database_explorer_table(
 def health():
     return {
         "status": "ok",
-        "version": "17.0.0",
+        "version": "19.0.0",
     }

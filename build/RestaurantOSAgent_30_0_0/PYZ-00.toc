@@ -1,4 +1,4 @@
-('C:\\TillypadDashboard\\build\\RestaurantOSAgent_17_0_0\\PYZ-00.pyz',
+('C:\\TillypadDashboard\\build\\RestaurantOSAgent_30_0_0\\PYZ-00.pyz',
  [('__future__',
    'C:\\Users\\Dante '
    'Alegieri\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\__future__.py',
@@ -148,6 +148,9 @@
    'Alegieri\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\annotated_types\\__init__.py',
    'PYMODULE'),
   ('app', 'C:\\TillypadDashboard\\app\\__init__.py', 'PYMODULE'),
+  ('app.agent_config',
+   'C:\\TillypadDashboard\\app\\agent_config.py',
+   'PYMODULE'),
   ('app.agent_diagnostics',
    'C:\\TillypadDashboard\\app\\agent_diagnostics.py',
    'PYMODULE'),

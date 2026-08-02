@@ -37,6 +37,7 @@ from app.sql_autodetect import (
 )
 from app.local_agent_web import LocalAgentWebServer
 from app.agent_state import get_runtime_state
+from app.agent_config import reload_config
 from app.service_manager import (
     install_service,
     query_service,
@@ -48,7 +49,7 @@ from app.service_manager import (
 
 
 APP_NAME = "Restaurant OS Agent"
-VERSION = "17.0.0"
+VERSION = "30.0.0"
 SERVICE_NAME = "RestaurantOSAgent"
 SERVICE_DISPLAY_NAME = "Restaurant OS Agent"
 
@@ -83,6 +84,7 @@ DEFAULTS = {
     "TILLYPAD_QUERY_CACHE_TTL": "45",
     "TILLYPAD_QUERY_CACHE_MAX": "256",
     "TILLYPAD_WS_COMPRESS_THRESHOLD": "65536",
+    "TILLYPAD_CLOUD_SYNC_SECONDS": "300",
     "RESTAURANTOS_LOCAL_WEB_HOST": "127.0.0.1",
     "RESTAURANTOS_LOCAL_WEB_PORT": "8090",
 }
@@ -108,6 +110,7 @@ def configure_environment() -> None:
 
     os.environ["GASTRODOM_ENV_FILE"] = str(ENV_FILE)
     os.environ["RESTAURANTOS_DATA_DIR"] = str(DATA_DIR)
+    reload_config()
     os.environ.setdefault(
         "TILLYPAD_RELAY_CACHE_DIR",
         str(DATA_DIR / "cache"),
@@ -248,17 +251,14 @@ class RestaurantOSAgentService(
             version=VERSION,
             service_status="running",
         )
+        config = reload_config()
+        state.update(
+            agent_id=config.agent_id,
+            gateway_url=config.gateway_url,
+        )
         self.web_server = LocalAgentWebServer(
-            host=os.environ.get(
-                "RESTAURANTOS_LOCAL_WEB_HOST",
-                "127.0.0.1",
-            ),
-            port=int(
-                os.environ.get(
-                    "RESTAURANTOS_LOCAL_WEB_PORT",
-                    "8090",
-                )
-            ),
+            host=config.local_web_host,
+            port=config.local_web_port,
         )
         self.web_server.start()
         servicemanager.LogInfoMsg(
@@ -812,7 +812,14 @@ class ConfigWindow(tk.Tk):
             "\n".join(lines) + "\n",
             encoding="utf-8",
         )
-        self.status.set("Настройки сохранены")
+        try:
+            reload_marker = DATA_DIR / "reload_config.request"
+            reload_marker.write_text("1", encoding="utf-8")
+        except OSError:
+            pass
+        self.status.set(
+            "Настройки сохранены. Служба перечитает их автоматически."
+        )
 
         if show_message:
             messagebox.showinfo(

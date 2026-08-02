@@ -7,7 +7,7 @@ import logging
 import os
 import platform
 import socket
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,7 @@ from app.query_cache import QueryCache
 from app.payload_codec import encode_payload
 from app.websocket_protocol import GatewayMessage
 from app.agent_state import get_runtime_state, utc_now
+from app.agent_config import reload_config
 
 
 LOGGER = logging.getLogger("gastrodom.websocket_agent")
@@ -43,6 +44,12 @@ class WebSocketAgentClient:
         )
         self.reconnect_max_seconds = int(
             os.environ.get("TILLYPAD_WS_RECONNECT_MAX", "60")
+        )
+        self.cloud_sync_seconds = int(
+            os.environ.get(
+                "TILLYPAD_CLOUD_SYNC_SECONDS",
+                "300",
+            )
         )
 
         self.database = SqlServer()
@@ -72,11 +79,58 @@ class WebSocketAgentClient:
             sql_status="configured",
         )
 
+    def _reload_config_if_needed(self) -> None:
+        data_dir = Path(
+            os.environ.get(
+                "RESTAURANTOS_DATA_DIR",
+                os.getcwd(),
+            )
+        )
+        marker = data_dir / "reload_config.request"
+
+        config = reload_config()
+        changed = (
+            config.agent_id != self.agent_id
+            or config.gateway_url != self.gateway_url
+            or config.api_key != self.api_key
+        )
+
+        if marker.exists():
+            changed = True
+            try:
+                marker.unlink()
+            except OSError:
+                pass
+
+        if changed:
+            old_agent_id = self.agent_id
+            old_gateway = self.gateway_url
+
+            self.agent_id = config.agent_id
+            self.gateway_url = config.gateway_url
+            self.api_key = config.api_key
+
+            self.state.update(
+                agent_id=self.agent_id,
+                gateway_url=self.gateway_url,
+                gateway_status="disconnected",
+                last_error=None,
+            )
+            LOGGER.info(
+                "Конфигурация перечитана: agent_id %s -> %s, "
+                "gateway %s -> %s",
+                old_agent_id,
+                self.agent_id,
+                old_gateway,
+                self.gateway_url,
+            )
+
     async def run_forever(self) -> None:
         delay = 2
         attempt = 0
 
         while True:
+            self._reload_config_if_needed()
             attempt += 1
             self.state.update(
                 gateway_status="connecting",
@@ -139,6 +193,9 @@ class WebSocketAgentClient:
             heartbeat_task = asyncio.create_task(
                 self._heartbeat_loop(websocket)
             )
+            cloud_sync_task = asyncio.create_task(
+                self._cloud_sync_loop(websocket)
+            )
             try:
                 async for raw_message in websocket:
                     await self._handle_message(websocket, raw_message)
@@ -148,15 +205,18 @@ class WebSocketAgentClient:
                     last_disconnected_at=utc_now(),
                 )
                 heartbeat_task.cancel()
+                cloud_sync_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await heartbeat_task
+                with contextlib.suppress(asyncio.CancelledError):
+                    await cloud_sync_task
 
     async def _send_hello(self, websocket: Any) -> None:
         message = GatewayMessage(
             type="agent_hello",
             agent_id=self.agent_id,
             payload={
-                "agent_version": "17.0.0",
+                "agent_version": "30.0.0",
                 "hostname": platform.node(),
                 "database_name": os.environ.get(
                     "TILLYPAD_SQL_DATABASE",
@@ -169,6 +229,7 @@ class WebSocketAgentClient:
                     "cache_control",
                     "heartbeat",
                     "automatic_reconnect",
+                    "cloud_snapshots",
                 ],
                 "allowed_queries": self.registry.names(),
             },
@@ -195,6 +256,107 @@ class WebSocketAgentClient:
                 cache_entries=self.cache.size(),
             )
             self._consume_local_commands()
+
+    async def _cloud_sync_loop(self, websocket: Any) -> None:
+        # Первая отправка почти сразу после подключения.
+        await asyncio.sleep(3)
+
+        while True:
+            try:
+                payload = await asyncio.to_thread(
+                    self._build_cloud_snapshot,
+                )
+                message = GatewayMessage(
+                    type="cloud_snapshot",
+                    agent_id=self.agent_id,
+                    payload=encode_payload(
+                        payload,
+                        threshold_bytes=self.compress_threshold_bytes,
+                    ),
+                )
+                await websocket.send(message.model_dump_json())
+                self.state.update(
+                    last_cloud_sync_at=utc_now(),
+                    sql_status="ok",
+                    last_error=None,
+                )
+                LOGGER.info(
+                    "Облачный снимок отправлен: дата=%s, выручка=%s, чеков=%s",
+                    payload.get("business_date"),
+                    payload.get("revenue"),
+                    payload.get("checks_count"),
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                LOGGER.exception(
+                    "Не удалось сформировать облачный снимок: %s",
+                    exc,
+                )
+                self.state.update(
+                    sql_status="error",
+                    last_error=f"Cloud sync: {exc}",
+                )
+
+            await asyncio.sleep(max(30, self.cloud_sync_seconds))
+
+    def _build_cloud_snapshot(self) -> dict[str, Any]:
+        business_date = date.today().isoformat()
+        period = {
+            "date_from": business_date,
+            "date_to": business_date,
+        }
+
+        summary_sql, summary_args = self.registry.build(
+            "sales_summary",
+            period,
+        )
+        summary = self._execute_query(summary_sql, summary_args)
+
+        hourly_sql, hourly_args = self.registry.build(
+            "sales_hourly",
+            period,
+        )
+        hourly = self._execute_query(hourly_sql, hourly_args)
+
+        menu_sql, menu_args = self.registry.build(
+            "menu_items",
+            period,
+        )
+        menu = self._execute_query(menu_sql, menu_args)
+
+        revenue = 0
+        checks_count = 0
+        if summary.get("rows"):
+            row = summary["rows"][0]
+            columns = summary.get("columns") or []
+            values = dict(zip(columns, row))
+            revenue = values.get("revenue") or 0
+            checks_count = values.get("checks_count") or 0
+
+        average_check = (
+            float(revenue) / int(checks_count)
+            if checks_count
+            else 0
+        )
+
+        return {
+            "schema_version": 2,
+            "agent_version": "30.0.0",
+            "business_date": business_date,
+            "captured_at": utc_now(),
+            "revenue": revenue,
+            "checks_count": checks_count,
+            "average_check": round(average_check, 2),
+            "hourly": {
+                "columns": hourly.get("columns") or [],
+                "rows": hourly.get("rows") or [],
+            },
+            "menu": {
+                "columns": menu.get("columns") or [],
+                "rows": menu.get("rows") or [],
+            },
+        }
 
     async def _handle_message(
         self,

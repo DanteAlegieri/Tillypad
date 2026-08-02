@@ -482,3 +482,83 @@ Invoke-RestMethod http://127.0.0.1:8090/health
 ```text
 dist\RestaurantOSAgent_17_0_0.exe
 ```
+
+
+## v18.0 — единая конфигурация
+
+Исправлен главный дефект v17: GUI, служба и веб-интерфейс
+теперь используют один и тот же `agent.env`.
+
+Архитектура:
+
+```text
+agent.env
+   └── AgentConfig
+       ├── GUI
+       ├── Windows Service
+       ├── WebSocket Client
+       └── Local Web UI
+```
+
+Добавлено:
+
+- единый `AgentConfig`;
+- принудительная загрузка `agent.env` до запуска службы;
+- запрет использования старых Agent ID и Gateway из
+  `runtime_state.json`;
+- горячее перечитывание настроек;
+- файл-команда `reload_config.request`;
+- автоматическое перечитывание после нажатия `Сохранить`;
+- кнопка `Перечитать настройки` в локальном Web UI;
+- отображение фактического пути к `agent.env`;
+- обновление WebSocket-клиента без переустановки.
+
+Проверка после установки:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8090/api/status
+```
+
+Должны отображаться:
+
+```text
+agent_id: gastrodom3
+gateway_url: ws://5.8.53.75:8020/ws/agent
+```
+
+Новый файл:
+
+```text
+dist\RestaurantOSAgent_18_0_0.exe
+```
+
+
+## v19.0 — автоматическая облачная синхронизация
+
+Агент автоматически каждые 5 минут отправляет на Gateway:
+
+- дату;
+- текущую выручку;
+- количество чеков;
+- средний чек;
+- продажи по часам;
+- время формирования снимка.
+
+Gateway сохраняет историю в SQLite. Это первый этап
+отделения Dashboard от прямых SQL-запросов.
+
+Новые API Gateway:
+
+```text
+GET /api/cloud/{agent_id}/sales/latest
+GET /api/cloud/{agent_id}/sales/history?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+```
+
+Настройка интервала агента:
+
+```env
+TILLYPAD_CLOUD_SYNC_SECONDS=300
+```
+
+После обновления Gateway и установки агента первый снимок
+отправляется примерно через 3 секунды после подключения.

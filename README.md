@@ -1200,3 +1200,229 @@ Invoke-RestMethod http://127.0.0.1:8090/health
 ```text
 dist\RestaurantOSAgent_17_0_0.exe
 ```
+
+
+## v18.0 — единая конфигурация
+
+Исправлен главный дефект v17: GUI, служба и веб-интерфейс
+теперь используют один и тот же `agent.env`.
+
+Архитектура:
+
+```text
+agent.env
+   └── AgentConfig
+       ├── GUI
+       ├── Windows Service
+       ├── WebSocket Client
+       └── Local Web UI
+```
+
+Добавлено:
+
+- единый `AgentConfig`;
+- принудительная загрузка `agent.env` до запуска службы;
+- запрет использования старых Agent ID и Gateway из
+  `runtime_state.json`;
+- горячее перечитывание настроек;
+- файл-команда `reload_config.request`;
+- автоматическое перечитывание после нажатия `Сохранить`;
+- кнопка `Перечитать настройки` в локальном Web UI;
+- отображение фактического пути к `agent.env`;
+- обновление WebSocket-клиента без переустановки.
+
+Проверка после установки:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8090/api/status
+```
+
+Должны отображаться:
+
+```text
+agent_id: gastrodom3
+gateway_url: ws://5.8.53.75:8020/ws/agent
+```
+
+Новый файл:
+
+```text
+dist\RestaurantOSAgent_18_0_0.exe
+```
+
+
+## v19.0 — автоматическая облачная синхронизация
+
+Агент автоматически каждые 5 минут отправляет на Gateway:
+
+- дату;
+- текущую выручку;
+- количество чеков;
+- средний чек;
+- продажи по часам;
+- время формирования снимка.
+
+Gateway сохраняет историю в SQLite. Это первый этап
+отделения Dashboard от прямых SQL-запросов.
+
+Новые API Gateway:
+
+```text
+GET /api/cloud/{agent_id}/sales/latest
+GET /api/cloud/{agent_id}/sales/history?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+```
+
+Настройка интервала агента:
+
+```env
+TILLYPAD_CLOUD_SYNC_SECONDS=300
+```
+
+После обновления Gateway и установки агента первый снимок
+отправляется примерно через 3 секунды после подключения.
+
+
+## v19.1 — автоматический деплой Gateway
+
+Добавлены:
+
+```text
+deploy_vps.ps1
+deploy_vps_example.ps1
+verify_vps.ps1
+```
+
+### Обновление VPS одной командой
+
+Из корня проекта:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File ".\deploy_vps.ps1" `
+  -VpsHost "5.8.53.75" `
+  -VpsUser "root" `
+  -RemotePath "/opt/restaurantos/gateway" `
+  -ExpectedVersion "1.2.0"
+```
+
+Скрипт автоматически:
+
+1. проверяет SSH;
+2. упаковывает новую папку `gateway`;
+3. не отправляет локальные `.env`, SQLite и данные;
+4. копирует релиз на VPS;
+5. сохраняет VPS-файл `.env`;
+6. сохраняет каталог `data` с базой Gateway;
+7. заменяет исходный код;
+8. пересобирает Docker-контейнер;
+9. проверяет `/health`;
+10. проверяет точную версию Gateway.
+
+### Проверка VPS
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File ".\verify_vps.ps1" `
+  -VpsHost "5.8.53.75"
+```
+
+С административным API:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File ".\verify_vps.ps1" `
+  -VpsHost "5.8.53.75" `
+  -AdminToken "ВАШ_ТОКЕН" `
+  -AgentId "gastrodom3"
+```
+
+
+## Restaurant OS 2.0 — кабинет владельца
+
+Gateway v2.0 включает встроенный веб-кабинет.
+
+После деплоя откройте:
+
+```text
+http://IP_VPS:8020/
+```
+
+Вход выполняется административным токеном из `.env`:
+
+```env
+GATEWAY_ADMIN_TOKEN=...
+```
+
+Кабинет показывает:
+
+- список подключённых ресторанов;
+- online/offline агента;
+- выручку за текущий день;
+- количество чеков;
+- средний чек;
+- версию агента;
+- время последней синхронизации;
+- почасовую диаграмму;
+- динамику по дням;
+- таблицу истории.
+
+Деплой:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File ".\deploy_vps.ps1" `
+  -VpsHost "5.8.53.75" `
+  -ExpectedVersion "2.0.0"
+```
+
+На первом этапе кабинет доступен по HTTP и порту 8020.
+Следующий инфраструктурный шаг — домен, Caddy и HTTPS.
+
+
+## Restaurant OS 2.1 — BI-панель
+
+Добавлено:
+
+- фильтры Сегодня, Вчера, 7 и 30 дней;
+- произвольный диапазон дат;
+- сравнение с предыдущим периодом;
+- динамика выручки и среднего чека;
+- продажи по часам;
+- выручка по дням;
+- лучший и слабый день;
+- максимальный средний чек;
+- история продаж;
+- адаптивная версия для телефона.
+
+Деплой:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File ".\deploy_vps.ps1" `
+  -VpsHost "5.8.53.75" `
+  -ExpectedVersion "2.1.0"
+```
+
+
+## Restaurant OS 2.1.1 — исправление входа
+
+Исправлена ошибка:
+
+```text
+KeyError: '--bg'
+```
+
+Причина: HTML-страница входа использовала `str.format()`,
+который воспринимал CSS-скобки как шаблонные поля.
+
+Теперь страница входа использует безопасный маркер
+`__LOGIN_ERROR__` и `str.replace()`.
+
+Деплой:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File ".\deploy_vps.ps1" `
+  -VpsHost "5.8.53.75" `
+  -ExpectedVersion "2.1.1"
+```

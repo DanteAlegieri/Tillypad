@@ -48,6 +48,24 @@ class GatewayStorage:
                     payload_json TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS sales_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    agent_id TEXT NOT NULL,
+                    business_date TEXT NOT NULL,
+                    captured_at TEXT NOT NULL,
+                    revenue REAL NOT NULL DEFAULT 0,
+                    checks_count INTEGER NOT NULL DEFAULT 0,
+                    average_check REAL NOT NULL DEFAULT 0,
+                    hourly_json TEXT NOT NULL DEFAULT '{}',
+                    payload_json TEXT NOT NULL,
+                    received_at TEXT NOT NULL,
+                    UNIQUE(agent_id, business_date, captured_at)
+                );
+
+                CREATE INDEX IF NOT EXISTS
+                    idx_sales_snapshots_agent_date
+                ON sales_snapshots(agent_id, business_date, captured_at);
                 """
             )
             self._ensure_column(
@@ -73,6 +91,12 @@ class GatewayStorage:
                 "agents",
                 "allowed_queries_json",
                 "TEXT",
+            )
+            self._ensure_column(
+                connection,
+                "sales_snapshots",
+                "menu_json",
+                "TEXT NOT NULL DEFAULT '{}'",
             )
 
     @staticmethod
@@ -199,6 +223,175 @@ class GatewayStorage:
                     agent_id,
                 ),
             )
+
+    def save_sales_snapshot(
+        self,
+        agent_id: str,
+        payload: dict[str, Any],
+    ) -> None:
+        business_date = str(payload.get("business_date") or "")
+        captured_at = str(payload.get("captured_at") or utc_now())
+        revenue = float(payload.get("revenue") or 0)
+        checks_count = int(payload.get("checks_count") or 0)
+        average_check = float(payload.get("average_check") or 0)
+        hourly = payload.get("hourly") or {}
+
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO sales_snapshots (
+                    agent_id,
+                    business_date,
+                    captured_at,
+                    revenue,
+                    checks_count,
+                    average_check,
+                    hourly_json,
+                    menu_json,
+                    payload_json,
+                    received_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    agent_id,
+                    business_date,
+                    captured_at,
+                    revenue,
+                    checks_count,
+                    average_check,
+                    json.dumps(hourly, ensure_ascii=False),
+                    json.dumps(
+                        payload.get("menu") or {},
+                        ensure_ascii=False,
+                    ),
+                    json.dumps(payload, ensure_ascii=False),
+                    utc_now(),
+                ),
+            )
+
+    def latest_sales_snapshot(
+        self,
+        agent_id: str,
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM sales_snapshots
+                WHERE agent_id = ?
+                ORDER BY captured_at DESC
+                LIMIT 1
+                """,
+                (agent_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["hourly"] = json.loads(result.pop("hourly_json"))
+        result["menu"] = json.loads(
+            result.pop("menu_json") or "{}"
+        )
+        result["payload"] = json.loads(result.pop("payload_json"))
+        return result
+
+    def sales_history(
+        self,
+        agent_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT s.*
+                FROM sales_snapshots AS s
+                INNER JOIN (
+                    SELECT
+                        business_date,
+                        MAX(captured_at) AS captured_at
+                    FROM sales_snapshots
+                    WHERE agent_id = ?
+                      AND business_date BETWEEN ? AND ?
+                    GROUP BY business_date
+                ) AS latest
+                    ON latest.business_date = s.business_date
+                   AND latest.captured_at = s.captured_at
+                WHERE s.agent_id = ?
+                ORDER BY s.business_date
+                """,
+                (agent_id, date_from, date_to, agent_id),
+            ).fetchall()
+
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            item["hourly"] = json.loads(item.pop("hourly_json"))
+            item["menu"] = json.loads(
+                item.pop("menu_json") or "{}"
+            )
+            item.pop("payload_json", None)
+            result.append(item)
+        return result
+
+    def menu_sales_history(
+        self,
+        agent_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> list[dict[str, Any]]:
+        snapshots = self.sales_history(agent_id, date_from, date_to)
+        aggregated: dict[str, dict[str, Any]] = {}
+
+        for snapshot in snapshots:
+            menu = snapshot.get("menu") or {}
+            columns = list(menu.get("columns") or [])
+            rows = list(menu.get("rows") or [])
+
+            for row in rows:
+                values = dict(zip(columns, row))
+                item_key = str(
+                    values.get("item_id")
+                    or values.get("item_name")
+                    or ""
+                )
+                if not item_key:
+                    continue
+
+                item = aggregated.setdefault(
+                    item_key,
+                    {
+                        "item_id": values.get("item_id"),
+                        "item_name": values.get("item_name")
+                        or "Без названия",
+                        "quantity": 0.0,
+                        "revenue": 0.0,
+                    },
+                )
+                item["quantity"] += float(values.get("quantity") or 0)
+                item["revenue"] += float(values.get("revenue") or 0)
+
+        result = sorted(
+            aggregated.values(),
+            key=lambda item: item["revenue"],
+            reverse=True,
+        )
+        total_revenue = sum(item["revenue"] for item in result)
+        cumulative = 0.0
+
+        for item in result:
+            cumulative += item["revenue"]
+            share = item["revenue"] / total_revenue * 100 if total_revenue else 0
+            cumulative_share = cumulative / total_revenue * 100 if total_revenue else 0
+            item["revenue_share"] = round(share, 2)
+            item["cumulative_share"] = round(cumulative_share, 2)
+            item["abc_class"] = (
+                "A" if cumulative_share <= 80
+                else "B" if cumulative_share <= 95
+                else "C"
+            )
+
+        return result
 
     def list_agents(self) -> list[dict[str, Any]]:
         with self.connect() as connection:

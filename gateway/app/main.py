@@ -20,7 +20,7 @@ from .owner_dashboard import setup_dashboard_routes
 
 app = FastAPI(
     title="Restaurant Gateway",
-    version="3.0.0",
+    version="4.2.0",
 )
 storage = GatewayStorage(settings.database_path)
 connections = ConnectionManager()
@@ -58,7 +58,7 @@ def health() -> dict:
     return {
         "ok": True,
         "service": "restaurant-gateway",
-        "version": "3.0.0",
+        "version": "4.2.0",
         "online_agents": len(connections.connections),
     }
 

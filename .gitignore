@@ -1,8 +1,40 @@
+# Secrets
 .env
-data/*.db
-logs/*.log
+*.env
+!.env.example
+*.pem
+*.ppk
+id_ed25519
+id_rsa
+
+# Runtime data
+data/
+*.db
+*.sqlite
+*.sqlite3
+runtime_state.json
+*.log
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
 .venv/
-.idea/
+venv/
+
+# Builds
+build/
+dist/
+*.spec
+
+# IDE
 .vscode/
+.idea/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Archives
+*.zip
+*.tar.gz

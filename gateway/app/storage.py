@@ -66,6 +66,24 @@ class GatewayStorage:
                 CREATE INDEX IF NOT EXISTS
                     idx_sales_snapshots_agent_date
                 ON sales_snapshots(agent_id, business_date, captured_at);
+
+
+                CREATE TABLE IF NOT EXISTS health_scores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    agent_id TEXT NOT NULL,
+                    business_date TEXT NOT NULL,
+                    calculated_at TEXT NOT NULL,
+                    score INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    factors_json TEXT NOT NULL,
+                    revenue_delta REAL,
+                    average_check_delta REAL,
+                    UNIQUE(agent_id, business_date, calculated_at)
+                );
+
+                CREATE INDEX IF NOT EXISTS
+                    idx_health_scores_agent_date
+                ON health_scores(agent_id, business_date, calculated_at);
                 """
             )
             self._ensure_column(
@@ -391,6 +409,105 @@ class GatewayStorage:
                 else "C"
             )
 
+        return result
+
+    def save_health_score(
+        self,
+        agent_id: str,
+        business_date: str,
+        report: dict[str, Any],
+    ) -> None:
+        health = report.get("health") or {}
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO health_scores (
+                    agent_id,
+                    business_date,
+                    calculated_at,
+                    score,
+                    status,
+                    factors_json,
+                    revenue_delta,
+                    average_check_delta
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    agent_id,
+                    business_date,
+                    utc_now(),
+                    int(health.get("score") or 0),
+                    str(health.get("status") or "attention"),
+                    json.dumps(
+                        health.get("factors") or [],
+                        ensure_ascii=False,
+                    ),
+                    health.get("revenue_delta"),
+                    health.get("average_check_delta"),
+                ),
+            )
+
+    def health_score_history(
+        self,
+        agent_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT h.*
+                FROM health_scores AS h
+                INNER JOIN (
+                    SELECT
+                        business_date,
+                        MAX(calculated_at) AS calculated_at
+                    FROM health_scores
+                    WHERE agent_id = ?
+                      AND business_date BETWEEN ? AND ?
+                    GROUP BY business_date
+                ) AS latest
+                    ON latest.business_date = h.business_date
+                   AND latest.calculated_at = h.calculated_at
+                WHERE h.agent_id = ?
+                ORDER BY h.business_date
+                """,
+                (agent_id, date_from, date_to, agent_id),
+            ).fetchall()
+
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            item["factors"] = json.loads(
+                item.pop("factors_json") or "[]"
+            )
+            result.append(item)
+        return result
+
+    def latest_health_score(
+        self,
+        agent_id: str,
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM health_scores
+                WHERE agent_id = ?
+                ORDER BY calculated_at DESC
+                LIMIT 1
+                """,
+                (agent_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        result = dict(row)
+        result["factors"] = json.loads(
+            result.pop("factors_json") or "[]"
+        )
         return result
 
     def list_agents(self) -> list[dict[str, Any]]:

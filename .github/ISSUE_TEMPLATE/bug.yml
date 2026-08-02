@@ -1,0 +1,27 @@
+name: Ошибка
+description: Сообщить о проблеме
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Что произошло?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как повторить?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Версия
+      placeholder: Gateway 4.2.0 / Agent 30.0.0

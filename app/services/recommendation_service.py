@@ -30,6 +30,20 @@ class RecommendationService:
             menu["date_to"],
         )
 
+        service_positions = {
+            "доставка",
+            "доставка курьером",
+            "стоимость доставки",
+            "самовывоз",
+        }
+        opportunities = [
+            row for row in opportunities
+            if str(row.get("base_item_name") or "").strip().lower()
+               not in service_positions
+            and str(row.get("pair_item_name") or "").strip().lower()
+               not in service_positions
+        ]
+
         menu_recommendations = self.engine.menu_recommendations(
             menu["items"],
             menu["date_from"],

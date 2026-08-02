@@ -8,11 +8,26 @@
         <h1>Цифровой маркетолог</h1>
         <p>Возможности роста среднего чека, связки товаров и план действий.</p>
     </div>
-    <form class="tech-filter" method="get">
-        <label><span>С</span><input type="date" name="date_from" value="{{ result.date_from }}"></label>
-        <label><span>По</span><input type="date" name="date_to" value="{{ result.date_to }}"></label>
-        <button type="submit">Показать</button>
-    </form>
+    <div class="marketing-filter-panel">
+        <div class="quick-periods" aria-label="Быстрый выбор периода">
+            <button type="button" class="quick-period-btn" data-period="today">Сегодня</button>
+            <button type="button" class="quick-period-btn" data-period="yesterday">Вчера</button>
+            <button type="button" class="quick-period-btn" data-period="current-month">Этот месяц</button>
+            <button type="button" class="quick-period-btn" data-period="previous-month">Прошлый месяц</button>
+        </div>
+
+        <form class="tech-filter" id="marketing-period-form" method="get">
+            <label>
+                <span>С</span>
+                <input id="marketing-date-from" type="date" name="date_from" value="{{ result.date_from }}">
+            </label>
+            <label>
+                <span>По</span>
+                <input id="marketing-date-to" type="date" name="date_to" value="{{ result.date_to }}">
+            </label>
+            <button type="submit">Показать</button>
+        </form>
+    </div>
 </section>
 
 <section class="panel daily-brief">
@@ -138,6 +153,10 @@
 <section class="panel">
     <div class="eyebrow">АНАЛИЗ КОРЗИНЫ</div>
     <h2>Лучшие возможности допродажи</h2>
+    <p class="basket-analysis-note">
+        Служебные позиции — доставка, стоимость доставки и самовывоз —
+        исключены из анализа связок.
+    </p>
 
     <div class="marketing-pair-grid">
         {% for row in result.opportunities %}
@@ -159,4 +178,86 @@
         {% endfor %}
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+    const form = document.getElementById("marketing-period-form");
+    const fromInput = document.getElementById("marketing-date-from");
+    const toInput = document.getElementById("marketing-date-to");
+    const buttons = document.querySelectorAll(".quick-period-btn");
+
+    if (!form || !fromInput || !toInput || !buttons.length) {
+        return;
+    }
+
+    const isoDate = (value) => {
+        const year = value.getFullYear();
+        const month = String(value.getMonth() + 1).padStart(2, "0");
+        const day = String(value.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    };
+
+    const localToday = () => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    };
+
+    const setRange = (period) => {
+        const today = localToday();
+        let start = new Date(today);
+        let end = new Date(today);
+
+        if (period === "yesterday") {
+            start.setDate(start.getDate() - 1);
+            end = new Date(start);
+        } else if (period === "current-month") {
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
+            end = new Date(today);
+        } else if (period === "previous-month") {
+            start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            end = new Date(today.getFullYear(), today.getMonth(), 0);
+        }
+
+        fromInput.value = isoDate(start);
+        toInput.value = isoDate(end);
+        form.submit();
+    };
+
+    buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+            setRange(button.dataset.period);
+        });
+    });
+
+    const currentFrom = fromInput.value;
+    const currentTo = toInput.value;
+    const today = localToday();
+    const ranges = {
+        "today": [isoDate(today), isoDate(today)],
+        "yesterday": (() => {
+            const value = new Date(today);
+            value.setDate(value.getDate() - 1);
+            return [isoDate(value), isoDate(value)];
+        })(),
+        "current-month": [
+            isoDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+            isoDate(today),
+        ],
+        "previous-month": [
+            isoDate(new Date(today.getFullYear(), today.getMonth() - 1, 1)),
+            isoDate(new Date(today.getFullYear(), today.getMonth(), 0)),
+        ],
+    };
+
+    buttons.forEach((button) => {
+        const range = ranges[button.dataset.period];
+        if (range && range[0] === currentFrom && range[1] === currentTo) {
+            button.classList.add("active");
+        }
+    });
+})();
+</script>
 {% endblock %}

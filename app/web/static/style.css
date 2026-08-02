@@ -4882,3 +4882,64 @@ table td small{
         margin-bottom:10px;
     }
 }
+
+
+/* v14.3 — быстрые периоды и чистый анализ корзины */
+
+.marketing-filter-panel{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:10px;
+}
+
+.quick-periods{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    gap:8px;
+}
+
+.quick-period-btn{
+    margin:0;
+    padding:9px 13px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:#fff;
+    color:var(--text);
+    font-size:11px;
+    font-weight:800;
+}
+
+.quick-period-btn:hover{
+    border-color:#bb6c5f;
+    background:#fff7f5;
+    color:var(--accent);
+}
+
+.quick-period-btn.active{
+    border-color:var(--accent);
+    background:var(--accent);
+    color:#fff;
+}
+
+.basket-analysis-note{
+    margin:-5px 0 15px;
+    color:var(--muted);
+    font-size:11px;
+}
+
+@media(max-width:900px){
+    .marketing-filter-panel{
+        width:100%;
+        align-items:stretch;
+    }
+
+    .quick-periods{
+        justify-content:flex-start;
+    }
+}
+
+
+/* v15.0 — Relay Agent */
+.connection-status-card{display:grid;grid-template-columns:18px 1fr;gap:18px;align-items:start}.connection-light{width:14px;height:14px;border-radius:50%;margin-top:7px}.connection-ok .connection-light{background:#4a8063;box-shadow:0 0 0 6px #eaf5ed}.connection-error .connection-light{background:#a53124;box-shadow:0 0 0 6px #fdebea}.connection-status-card pre{padding:12px;border-radius:10px;background:#f7efec;white-space:pre-wrap}.relay-flow{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:18px 0}.relay-flow span{padding:14px 18px;border:1px solid var(--border);border-radius:11px;background:#fff;font-weight:800}.relay-flow b{color:var(--accent);font-size:20px}

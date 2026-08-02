@@ -163,9 +163,18 @@ class MarketingRepository:
                     FROM dbo.tp_CheckItems AS ci
                     INNER JOIN dbo.tp_Checks AS c
                         ON c.chck_ID = ci.chit_chck_ID
+                    INNER JOIN dbo.tp_MenuItems AS mi
+                        ON mi.mitm_ID = ci.chit_mitm_ID
                     WHERE c.chck_Date >= ?
                       AND c.chck_Date < ?
                       AND ci.chit_Count > 0
+                      AND LOWER(LTRIM(RTRIM(COALESCE(mi.mitm_Name, N''))))
+                          NOT IN (
+                              N'доставка',
+                              N'доставка курьером',
+                              N'стоимость доставки',
+                              N'самовывоз'
+                          )
                 ),
                 ItemCounts AS (
                     SELECT
@@ -202,9 +211,18 @@ class MarketingRepository:
                     FROM dbo.tp_CheckItems AS ci
                     INNER JOIN dbo.tp_Checks AS c
                         ON c.chck_ID = ci.chit_chck_ID
+                    INNER JOIN dbo.tp_MenuItems AS mi
+                        ON mi.mitm_ID = ci.chit_mitm_ID
                     WHERE c.chck_Date >= ?
                       AND c.chck_Date < ?
                       AND ci.chit_Count > 0
+                      AND LOWER(LTRIM(RTRIM(COALESCE(mi.mitm_Name, N''))))
+                          NOT IN (
+                              N'доставка',
+                              N'доставка курьером',
+                              N'стоимость доставки',
+                              N'самовывоз'
+                          )
                     GROUP BY ci.chit_mitm_ID
                 ),
                 RankedPairs AS (
@@ -255,7 +273,23 @@ class MarketingRepository:
             )
             rows = self._rows(cursor)
 
+        excluded_service_names = {
+            "доставка",
+            "доставка курьером",
+            "стоимость доставки",
+            "самовывоз",
+        }
+        clean_rows = []
+
         for row in rows:
+            base_name = str(row.get("base_item_name") or "").strip().lower()
+            pair_name = str(row.get("pair_item_name") or "").strip().lower()
+            if (
+                base_name in excluded_service_names
+                or pair_name in excluded_service_names
+            ):
+                continue
+
             for key in (
                 "attach_rate",
                 "pair_avg_price",
@@ -264,4 +298,6 @@ class MarketingRepository:
                 row[key] = float(row.get(key) or 0)
             for key in ("base_checks", "pair_checks", "missing_checks"):
                 row[key] = int(row.get(key) or 0)
-        return rows
+            clean_rows.append(row)
+
+        return clean_rows

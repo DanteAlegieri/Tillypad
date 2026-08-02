@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Подключение к TillyPad{% endblock %}
+{% block content %}
+<section class="page-header">
+    <div><div class="eyebrow">ИНФРАСТРУКТУРА</div><h1>Подключение к TillyPad</h1><p>Диагностика источника данных и промежуточного сервиса.</p></div>
+</section>
+<section class="panel connection-status-card {{ 'connection-ok' if result.ok else 'connection-error' }}">
+    <div class="connection-light"></div>
+    <div>
+        <div class="eyebrow">{{ result.label }}</div>
+        <h2>{{ 'Соединение работает' if result.ok else 'Соединение недоступно' }}</h2>
+        <p><strong>Режим:</strong> {{ result.mode }}</p>
+        <p><strong>Адрес:</strong> {{ result.url }}</p>
+        {% if result.database %}<p><strong>База:</strong> {{ result.database }}</p>{% endif %}
+        {% if result.latency_ms is not none %}<p><strong>Задержка:</strong> {{ result.latency_ms }} мс</p>{% endif %}
+        {% if result.error %}<pre>{{ result.error }}</pre>{% endif %}
+    </div>
+</section>
+<section class="panel">
+    <div class="eyebrow">КАК ЭТО РАБОТАЕТ</div><h2>Отказоустойчивая схема</h2>
+    <div class="relay-flow"><span>TillyPad SQL</span><b>→</b><span>Relay Agent</span><b>→</b><span>Restaurant OS</span><b>→</b><span>Локальный кэш</span></div>
+    <p class="muted">При кратковременном обрыве Dashboard повторяет запрос, затем использует последний успешно сохранённый ответ для точно такого же запроса.</p>
+</section>
+{% endblock %}

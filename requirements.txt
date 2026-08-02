@@ -5,3 +5,5 @@ python-multipart>=0.0.20,<1
 pydantic-settings>=2.10,<3
 pyodbc>=5.3,<6
 loguru>=0.7,<1
+
+pywin32>=308

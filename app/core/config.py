@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,8 +20,17 @@ class Settings(BaseSettings):
     tillypad_sql_trust_certificate: str = "yes"
     tillypad_sql_timeout: int = 10
 
+    # direct | relay
+    tillypad_connection_mode: str = "direct"
+    tillypad_relay_url: str = "http://127.0.0.1:8010"
+    tillypad_relay_api_key: str = ""
+    tillypad_relay_timeout: int = 15
+    tillypad_relay_retries: int = 2
+    tillypad_relay_cache_dir: str = ".relay_cache"
+    tillypad_relay_allow_stale_cache: bool = True
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.environ.get("GASTRODOM_ENV_FILE", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

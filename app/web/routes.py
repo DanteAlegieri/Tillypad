@@ -13,6 +13,7 @@ from app.services.schema_map_service import SchemaMapService
 from app.services.sales_service import SalesService
 from app.services.menu_analytics_service import MenuAnalyticsService
 from app.services.recommendation_service import RecommendationService
+from app.services.connection_service import ConnectionService
 from app.services.menu_service import MenuService
 from app.services.finance_service import FinanceService
 from app.services.operations_service import OperationsService
@@ -231,6 +232,15 @@ def marketing_dashboard(
             "result": result,
             "error": error,
         },
+    )
+
+
+@router.get("/connection", response_class=HTMLResponse)
+def connection_status(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="connection_status.html",
+        context={"result": ConnectionService().status()},
     )
 
 
@@ -554,5 +564,5 @@ def database_explorer_table(
 def health():
     return {
         "status": "ok",
-        "version": "14.2.0",
+        "version": "15.1.0",
     }

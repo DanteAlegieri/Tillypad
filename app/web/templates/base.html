@@ -14,7 +14,7 @@
             <div class="brand-mark">Г3</div>
             <div>
                 <div class="brand-name">ГАСТРОДОМ №3</div>
-                <div class="brand-version">Система управления рестораном<br>для TillyPad<br><span class="brand-version">v14.2</span></div>
+                <div class="brand-version">Система управления рестораном<br>для TillyPad<br><span class="brand-version">v15.1</span></div>
             </div>
         </div>
 
@@ -123,6 +123,16 @@
 
             <div class="nav-section nav-section-system">
                 <div class="nav-section-title">СИСТЕМА</div>
+
+                <a href="/connection"
+                   class="nav-link {% if request.url.path.startswith('/connection') %}active{% endif %}"
+                   {% if request.url.path.startswith('/connection') %}aria-current="page"{% endif %}>
+                    <span class="nav-icon">⇄</span>
+                    <span class="nav-copy">
+                        <strong>Подключение</strong>
+                        <small>Relay Agent и источник данных</small>
+                    </span>
+                </a>
 
                 <a href="/sql-explorer"
                    class="nav-link {% if request.url.path.startswith('/sql-explorer') %}active{% endif %}"

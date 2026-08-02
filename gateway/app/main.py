@@ -15,16 +15,21 @@ from .config import settings
 from .connections import ConnectionManager
 from .protocol import GatewayMessage
 from .storage import GatewayStorage
+from .events import EventEngine, Snapshot, SQLiteEventRepository
+from .events.serializers import serialize_event, serialize_events
+from .events.types import EventSeverity, EventSource, EventStatus
 from .owner_dashboard import setup_dashboard_routes
 
 
 app = FastAPI(
     title="Restaurant Gateway",
-    version="4.2.0",
+    version="4.3.0",
 )
 storage = GatewayStorage(settings.database_path)
+event_repository = SQLiteEventRepository(storage.path)
+event_engine = EventEngine(event_repository)
 connections = ConnectionManager()
-app.include_router(setup_dashboard_routes(storage, connections))
+app.include_router(setup_dashboard_routes(storage, connections, event_repository))
 
 
 class CreateAgentRequest(BaseModel):
@@ -58,7 +63,7 @@ def health() -> dict:
     return {
         "ok": True,
         "service": "restaurant-gateway",
-        "version": "4.2.0",
+        "version": "4.3.0",
         "online_agents": len(connections.connections),
     }
 
@@ -195,6 +200,33 @@ def cloud_menu_history(
     )
 
 
+
+@app.get("/api/events", dependencies=[Depends(require_admin)])
+def list_events(
+    agent_id: str = Query(...),
+    status: EventStatus | None = Query(None),
+    source: EventSource | None = Query(None),
+    severity: EventSeverity | None = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+) -> list[dict]:
+    return serialize_events(event_repository.list(
+        agent_id=agent_id,status=status,source=source,
+        severity=severity,limit=limit))
+
+@app.get("/api/events/{event_id}", dependencies=[Depends(require_admin)])
+def get_event(event_id: str) -> dict:
+    event=event_repository.get(event_id)
+    if event is None:
+        raise HTTPException(status_code=404,detail="Событие не найдено")
+    return serialize_event(event)
+
+@app.post("/api/events/{event_id}/status", dependencies=[Depends(require_admin)])
+def update_event_status(event_id: str,status: EventStatus) -> dict:
+    event=event_repository.set_status(event_id,status)
+    if event is None:
+        raise HTTPException(status_code=404,detail="Событие не найдено")
+    return serialize_event(event)
+
 @app.websocket("/ws/agent")
 async def websocket_agent(websocket: WebSocket) -> None:
     agent_id = websocket.headers.get("x-agent-id", "").strip()
@@ -270,6 +302,23 @@ async def websocket_agent(websocket: WebSocket) -> None:
                 storage.save_sales_snapshot(
                     agent_id,
                     snapshot,
+                )
+                current_event_snapshot = Snapshot.from_payload(
+                    agent_id,
+                    snapshot,
+                )
+                previous_payload = storage.previous_sales_snapshot(
+                    agent_id,
+                    current_event_snapshot.created_at,
+                )
+                previous_event_snapshot = (
+                    Snapshot.from_payload(agent_id, previous_payload)
+                    if previous_payload
+                    else None
+                )
+                event_engine.process_snapshot(
+                    current_event_snapshot,
+                    previous_event_snapshot,
                 )
                 storage.update_seen(
                     agent_id,

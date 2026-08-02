@@ -1,4 +1,4 @@
-Restaurant OS AI 4.2
+Restaurant OS 4.3.0
 Agent 30.0.0
-Gateway 4.2.0
-Health Score History 1.0
+Gateway 4.3.0
+Event Engine 1.0

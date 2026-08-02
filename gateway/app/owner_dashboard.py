@@ -10,6 +10,8 @@ from .config import settings
 from .storage import GatewayStorage
 from .connections import ConnectionManager
 from .ai import build_director_report
+from .events.serializers import serialize_events
+from .events.types import EventSeverity, EventSource, EventStatus
 from .web_auth import (
     COOKIE_NAME,
     create_session_cookie,
@@ -469,13 +471,14 @@ async function loadAll(){
  const dateFrom=document.getElementById('date-from').value,dateTo=document.getElementById('date-to').value;
  const from=parseDate(dateFrom),to=parseDate(dateTo),days=diffDays(from,to),prevTo=new Date(from);prevTo.setDate(prevTo.getDate()-1);
  const prevFrom=new Date(prevTo);prevFrom.setDate(prevTo.getDate()-days+1);
- const [history,previous,agentInfo,latest,menu,aiReport]=await Promise.all([
+ const [history,previous,agentInfo,latest,menu,aiReport,eventItems]=await Promise.all([
   api(`/api/web/${agent}/sales/history?date_from=${dateFrom}&date_to=${dateTo}`),
   api(`/api/web/${agent}/sales/history?date_from=${isoDate(prevFrom)}&date_to=${isoDate(prevTo)}`),
   api(`/api/web/${agent}/status`),
   api(`/api/web/${agent}/sales/latest`).catch(()=>null),
   api(`/api/web/${agent}/menu/history?date_from=${dateFrom}&date_to=${dateTo}`).catch(()=>[]),
-  api(`/api/web/${agent}/ai/director?date_from=${dateFrom}&date_to=${dateTo}&previous_from=${isoDate(prevFrom)}&previous_to=${isoDate(prevTo)}`).catch(()=>null)
+  api(`/api/web/${agent}/ai/director?date_from=${dateFrom}&date_to=${dateTo}&previous_from=${isoDate(prevFrom)}&previous_to=${isoDate(prevTo)}`).catch(()=>null),
+  api(`/api/web/${agent}/events?limit=50`).catch(()=>[])
  ]);
  cached={history,previous,agentInfo,latest,menu};
  const revenue=sum(history,'revenue'),checks=sum(history,'checks_count'),avg=checks?revenue/checks:0,prevRevenue=sum(previous,'revenue'),prevChecks=sum(previous,'checks_count'),prevAvg=prevChecks?prevRevenue/prevChecks:0;
@@ -537,10 +540,12 @@ async function loadAll(){
  if(latest){const sync=new Date(latest.captured_at);mins=Math.max(0,Math.round((Date.now()-sync.getTime())/60000));document.getElementById('sync-age').textContent=mins<1?'сейчас':mins+' мин';document.getElementById('sync-time').textContent=latest.captured_at||'';const cols=latest.hourly?.columns||[],rows=latest.hourly?.rows||[];hourly=rows.map(r=>Object.fromEntries(cols.map((c,i)=>[c,r[i]])))}
  else{document.getElementById('sync-age').textContent='—';document.getElementById('sync-time').textContent='данные ещё не получены'}
 
- const aiEvents=aiReport?.events||[];
- document.getElementById('event-feed').innerHTML=aiEvents.length
-  ? aiEvents.map(x=>`<div class="action-card"><span class="badge">${x.source}</span><div><strong>${x.title}</strong><p>${x.text}</p></div><span>→</span></div>`).join('')
-  : '<div class="empty">Значимых событий не найдено</div>';
+
+const severityLabels={info:'Информация',success:'Положительно',warning:'Внимание',critical:'Срочно'};
+const sourceLabels={manager:'Управляющий',operations:'Операционный центр',marketing:'Цифровой маркетолог',technology:'Цифровой технолог',finance:'Финансовый директор',delivery:'Доставка',system:'Система'};
+document.getElementById('event-feed').innerHTML=eventItems.length
+ ? eventItems.map(x=>`<div class="action-card"><span class="badge">${severityLabels[x.severity]||x.severity}</span><div><strong>${x.title}</strong><p>${x.description}</p><small>${sourceLabels[x.source]||x.source} · ${x.created_at}</small></div><div class="action-score">${x.score}</div></div>`).join('')
+ : '<div class="empty">События появятся после следующего снимка агента.</div>';
 
  const aiRecommendations=aiReport?.recommendations||[];
  document.getElementById('decision-count').textContent=aiRecommendations.length;
@@ -583,6 +588,7 @@ setQuick('30');
 def setup_dashboard_routes(
     storage: GatewayStorage,
     connections: ConnectionManager,
+    event_repository,
 ) -> APIRouter:
 
     @router.get("/", include_in_schema=False)
@@ -843,5 +849,20 @@ def setup_dashboard_routes(
             date_from,
             date_to,
         )
+
+
+@router.get("/api/web/{agent_id}/events", include_in_schema=False)
+def web_events(
+    agent_id: str,
+    request: Request,
+    status: EventStatus | None = None,
+    source: EventSource | None = None,
+    severity: EventSeverity | None = None,
+    limit: int = 100,
+):
+    require_browser_session(request)
+    return serialize_events(event_repository.list(
+        agent_id=agent_id,status=status,source=source,
+        severity=severity,limit=limit))
 
     return router

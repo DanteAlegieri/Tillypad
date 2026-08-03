@@ -1494,3 +1494,8 @@ GET /api/web/{agent_id}/ai/health/history
 ```
 
 Обновлять Agent не требуется.
+
+
+### Hotfix 4.3.0
+
+Исправлена инициализация EventRepository: используется `settings.database_path`.

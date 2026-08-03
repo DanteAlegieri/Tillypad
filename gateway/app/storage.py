@@ -511,31 +511,53 @@ class GatewayStorage:
         return result
 
 
-def previous_sales_snapshot(
-    self,
-    agent_id: str,
-    captured_at: str,
-) -> dict[str, Any] | None:
-    with self.connect() as connection:
-        row = connection.execute(
-            """
-            SELECT *
-            FROM sales_snapshots
-            WHERE agent_id = ? AND captured_at < ?
-            ORDER BY captured_at DESC LIMIT 1
-            """,
-            (agent_id, captured_at),
-        ).fetchone()
-    if row is None:
-        return None
-    result = dict(row)
-    payload = json.loads(result.get("payload_json") or "{}")
-    payload.setdefault("business_date", result.get("business_date"))
-    payload.setdefault("captured_at", result.get("captured_at"))
-    payload.setdefault("revenue", result.get("revenue"))
-    payload.setdefault("checks_count", result.get("checks_count"))
-    payload.setdefault("average_check", result.get("average_check"))
-    return payload
+
+    def previous_sales_snapshot(
+        self,
+        agent_id: str,
+        captured_at: str,
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM sales_snapshots
+                WHERE agent_id = ?
+                  AND captured_at < ?
+                ORDER BY captured_at DESC
+                LIMIT 1
+                """,
+                (agent_id, captured_at),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        result = dict(row)
+        payload = json.loads(
+            result.get("payload_json") or "{}"
+        )
+        payload.setdefault(
+            "business_date",
+            result.get("business_date"),
+        )
+        payload.setdefault(
+            "captured_at",
+            result.get("captured_at"),
+        )
+        payload.setdefault(
+            "revenue",
+            result.get("revenue"),
+        )
+        payload.setdefault(
+            "checks_count",
+            result.get("checks_count"),
+        )
+        payload.setdefault(
+            "average_check",
+            result.get("average_check"),
+        )
+        return payload
 
     def list_agents(self) -> list[dict[str, Any]]:
         with self.connect() as connection:

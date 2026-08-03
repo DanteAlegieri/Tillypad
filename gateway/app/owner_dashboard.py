@@ -851,18 +851,27 @@ def setup_dashboard_routes(
         )
 
 
-@router.get("/api/web/{agent_id}/events", include_in_schema=False)
-def web_events(
-    agent_id: str,
-    request: Request,
-    status: EventStatus | None = None,
-    source: EventSource | None = None,
-    severity: EventSeverity | None = None,
-    limit: int = 100,
-):
-    require_browser_session(request)
-    return serialize_events(event_repository.list(
-        agent_id=agent_id,status=status,source=source,
-        severity=severity,limit=limit))
+    @router.get(
+        "/api/web/{agent_id}/events",
+        include_in_schema=False,
+    )
+    def web_events(
+        agent_id: str,
+        request: Request,
+        status: EventStatus | None = None,
+        source: EventSource | None = None,
+        severity: EventSeverity | None = None,
+        limit: int = 100,
+    ):
+        require_browser_session(request)
+        return serialize_events(
+            event_repository.list(
+                agent_id=agent_id,
+                status=status,
+                source=source,
+                severity=severity,
+                limit=limit,
+            )
+        )
 
     return router

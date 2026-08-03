@@ -15,40 +15,170 @@ class SQLiteEventRepository:
         return c
 
     def initialize(self):
-        with self.connect() as c:
-            c.executescript('''
-            CREATE TABLE IF NOT EXISTS events(
-              id TEXT PRIMARY KEY,
-              snapshot_id TEXT NOT NULL,
-              agent_id TEXT NOT NULL,
-              event_type TEXT NOT NULL,
-              severity TEXT NOT NULL,
-              source TEXT NOT NULL,
-              title TEXT NOT NULL,
-              description TEXT NOT NULL,
-              payload_json TEXT NOT NULL,
-              score INTEGER NOT NULL,
-              status TEXT NOT NULL,
-              created_at TEXT NOT NULL,
-              acknowledged_at TEXT,
-              resolved_at TEXT
-            );
-            CREATE INDEX IF NOT EXISTS idx_events_agent_created
-            ON events(agent_id,created_at DESC);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup
-            ON events(agent_id,snapshot_id,event_type,title);
-            ''')
+        expected_columns = [
+            "id", "snapshot_id", "agent_id", "event_type",
+            "severity", "source", "title", "description",
+            "payload_json", "score", "status", "created_at",
+            "acknowledged_at", "resolved_at",
+        ]
 
-    def save(self,event:Event)->Event:
-        with self.connect() as c:
-            c.execute('''
-            INSERT OR IGNORE INTO events VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ''',(
-              event.id,event.snapshot_id,event.agent_id,event.event_type.value,
-              event.severity.value,event.source.value,event.title,event.description,
-              json.dumps(event.payload,ensure_ascii=False),event.score,event.status.value,
-              event.created_at,event.acknowledged_at,event.resolved_at
-            ))
+        with self.connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='table' AND name='events'"
+            ).fetchone() is not None
+
+            if exists:
+                info = connection.execute(
+                    "PRAGMA table_info(events)"
+                ).fetchall()
+                columns = [row["name"] for row in info]
+                id_row = next(
+                    (row for row in info if row["name"] == "id"),
+                    None,
+                )
+                id_type = (
+                    str(id_row["type"] or "").upper()
+                    if id_row is not None
+                    else ""
+                )
+
+                if columns != expected_columns or id_type not in {"TEXT", ""}:
+                    connection.execute(
+                        "ALTER TABLE events RENAME TO events_legacy"
+                    )
+
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS events (
+                    id TEXT PRIMARY KEY,
+                    snapshot_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    score INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    acknowledged_at TEXT,
+                    resolved_at TEXT
+                )
+                """
+            )
+
+            legacy_exists = connection.execute(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='table' AND name='events_legacy'"
+            ).fetchone() is not None
+
+            if legacy_exists:
+                legacy_columns = {
+                    row["name"]
+                    for row in connection.execute(
+                        "PRAGMA table_info(events_legacy)"
+                    ).fetchall()
+                }
+
+                if {"id", "agent_id", "title"} <= legacy_columns:
+                    rows = connection.execute(
+                        "SELECT * FROM events_legacy"
+                    ).fetchall()
+
+                    for row in rows:
+                        data = dict(row)
+                        legacy_id = str(data.get("id") or "")
+                        if not legacy_id:
+                            continue
+
+                        connection.execute(
+                            """
+                            INSERT OR IGNORE INTO events (
+                                id, snapshot_id, agent_id, event_type,
+                                severity, source, title, description,
+                                payload_json, score, status, created_at,
+                                acknowledged_at, resolved_at
+                            )
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                legacy_id,
+                                str(
+                                    data.get("snapshot_id")
+                                    or f"legacy:{legacy_id}"
+                                ),
+                                str(data.get("agent_id") or "unknown"),
+                                str(
+                                    data.get("event_type")
+                                    or "snapshot_created"
+                                ),
+                                str(data.get("severity") or "info"),
+                                str(data.get("source") or "system"),
+                                str(
+                                    data.get("title")
+                                    or "Старое событие"
+                                ),
+                                str(data.get("description") or ""),
+                                str(data.get("payload_json") or "{}"),
+                                int(data.get("score") or 0),
+                                str(data.get("status") or "archived"),
+                                str(data.get("created_at") or ""),
+                                data.get("acknowledged_at"),
+                                data.get("resolved_at"),
+                            ),
+                        )
+
+                connection.execute("DROP TABLE events_legacy")
+
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_events_agent_created "
+                "ON events(agent_id, created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_events_status "
+                "ON events(agent_id, status, created_at DESC)"
+            )
+            connection.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup
+                ON events(agent_id, snapshot_id, event_type, title)
+                """
+            )
+
+    def save(self, event: Event) -> Event:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO events (
+                    id, snapshot_id, agent_id, event_type,
+                    severity, source, title, description,
+                    payload_json, score, status, created_at,
+                    acknowledged_at, resolved_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(event.id),
+                    str(event.snapshot_id),
+                    str(event.agent_id),
+                    event.event_type.value,
+                    event.severity.value,
+                    event.source.value,
+                    event.title,
+                    event.description,
+                    json.dumps(
+                        event.payload,
+                        ensure_ascii=False,
+                    ),
+                    int(event.score),
+                    event.status.value,
+                    event.created_at,
+                    event.acknowledged_at,
+                    event.resolved_at,
+                ),
+            )
         return event
 
     def list(self,agent_id:str,status:EventStatus|None=None,

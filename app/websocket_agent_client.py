@@ -171,8 +171,8 @@ class WebSocketAgentClient:
         async with websockets.connect(
             self.gateway_url,
             additional_headers=headers,
-            ping_interval=20,
-            ping_timeout=20,
+            ping_interval=15,
+            ping_timeout=45,
             close_timeout=10,
             open_timeout=15,
             max_size=16 * 1024 * 1024,
@@ -216,7 +216,7 @@ class WebSocketAgentClient:
             type="agent_hello",
             agent_id=self.agent_id,
             payload={
-                "agent_version": "30.0.0",
+                "agent_version": "31.0.0",
                 "hostname": platform.node(),
                 "database_name": os.environ.get(
                     "TILLYPAD_SQL_DATABASE",
@@ -230,6 +230,8 @@ class WebSocketAgentClient:
                     "heartbeat",
                     "automatic_reconnect",
                     "cloud_snapshots",
+                    "application_heartbeat_ack",
+                    "snapshot_ack",
                 ],
                 "allowed_queries": self.registry.names(),
             },
@@ -364,6 +366,34 @@ class WebSocketAgentClient:
         raw_message: str,
     ) -> None:
         message = GatewayMessage.model_validate_json(raw_message)
+
+        if message.type == "pong":
+            self.state.update(
+                gateway_status="connected",
+                last_heartbeat_at=utc_now(),
+                last_error=None,
+            )
+            return
+
+        if message.type == "snapshot_ack":
+            self.state.update(
+                gateway_status="connected",
+                last_error=None,
+            )
+            LOGGER.debug(
+                "Gateway подтвердил облачный снимок: %s",
+                message.payload.get("business_date"),
+            )
+            return
+
+        if message.type == "snapshot_error":
+            error = str(
+                message.payload.get("error")
+                or "Gateway не обработал снимок"
+            )
+            self.state.update(last_error=error)
+            LOGGER.error("Gateway отклонил снимок: %s", error)
+            return
 
         if message.type == "cache_clear":
             removed = self.cache.clear()

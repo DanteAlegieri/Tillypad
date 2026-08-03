@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import (
     Depends,
     FastAPI,
@@ -16,17 +18,20 @@ from .connections import ConnectionManager
 from .protocol import GatewayMessage
 from .storage import GatewayStorage
 from .events import EventEngine, Snapshot, SQLiteEventRepository
+from .events.models import utc_now
 from .events.serializers import serialize_event, serialize_events
 from .events.types import EventSeverity, EventSource, EventStatus
 from .owner_dashboard import setup_dashboard_routes
 
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="Restaurant Gateway",
-    version="4.3.0",
+    version="4.4.0",
 )
 storage = GatewayStorage(settings.database_path)
-event_repository = SQLiteEventRepository(storage.path)
+event_repository = SQLiteEventRepository(settings.database_path)
 event_engine = EventEngine(event_repository)
 connections = ConnectionManager()
 app.include_router(setup_dashboard_routes(storage, connections, event_repository))
@@ -63,7 +68,7 @@ def health() -> dict:
     return {
         "ok": True,
         "service": "restaurant-gateway",
-        "version": "4.3.0",
+        "version": "4.4.0",
         "online_agents": len(connections.connections),
     }
 
@@ -295,35 +300,90 @@ async def websocket_agent(websocket: WebSocket) -> None:
                         "cache_entries"
                     ),
                 )
+                await websocket.send_text(
+                    GatewayMessage(
+                        type="pong",
+                        agent_id=agent_id,
+                        request_id=message.request_id,
+                        payload={
+                            "ok": True,
+                            "server_time": utc_now(),
+                        },
+                    ).model_dump_json()
+                )
 
             elif message.type == "cloud_snapshot":
-                from .payload_codec import decode_payload
-                snapshot = decode_payload(message.payload)
-                storage.save_sales_snapshot(
-                    agent_id,
-                    snapshot,
-                )
-                current_event_snapshot = Snapshot.from_payload(
-                    agent_id,
-                    snapshot,
-                )
-                previous_payload = storage.previous_sales_snapshot(
-                    agent_id,
-                    current_event_snapshot.created_at,
-                )
-                previous_event_snapshot = (
-                    Snapshot.from_payload(agent_id, previous_payload)
-                    if previous_payload
-                    else None
-                )
-                event_engine.process_snapshot(
-                    current_event_snapshot,
-                    previous_event_snapshot,
-                )
-                storage.update_seen(
-                    agent_id,
-                    status="online",
-                )
+                try:
+                    from .payload_codec import decode_payload
+
+                    snapshot = decode_payload(message.payload)
+                    storage.save_sales_snapshot(
+                        agent_id,
+                        snapshot,
+                    )
+
+                    current_event_snapshot = Snapshot.from_payload(
+                        agent_id,
+                        snapshot,
+                    )
+                    previous_payload = storage.previous_sales_snapshot(
+                        agent_id,
+                        current_event_snapshot.created_at,
+                    )
+                    previous_event_snapshot = (
+                        Snapshot.from_payload(
+                            agent_id,
+                            previous_payload,
+                        )
+                        if previous_payload
+                        else None
+                    )
+
+                    try:
+                        event_engine.process_snapshot(
+                            current_event_snapshot,
+                            previous_event_snapshot,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Event Engine не обработал снимок агента %s",
+                            agent_id,
+                        )
+
+                    storage.update_seen(
+                        agent_id,
+                        status="online",
+                    )
+
+                    await websocket.send_text(
+                        GatewayMessage(
+                            type="snapshot_ack",
+                            agent_id=agent_id,
+                            request_id=message.request_id,
+                            payload={
+                                "ok": True,
+                                "business_date": snapshot.get(
+                                    "business_date"
+                                ),
+                            },
+                        ).model_dump_json()
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "Ошибка обработки облачного снимка агента %s",
+                        agent_id,
+                    )
+                    await websocket.send_text(
+                        GatewayMessage(
+                            type="snapshot_error",
+                            agent_id=agent_id,
+                            request_id=message.request_id,
+                            payload={
+                                "ok": False,
+                                "error": str(exc),
+                            },
+                        ).model_dump_json()
+                    )
 
             elif message.type in {
                 "query_result",

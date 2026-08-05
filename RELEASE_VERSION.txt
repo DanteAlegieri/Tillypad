@@ -1,8 +1,8 @@
-Restaurant OS 8.2.0 Director Dashboard
-Gateway 8.2.0
+Restaurant OS 9.0.0 Digital Director
+Gateway 9.0.0
 Agent 31.1.0
-Fixed attention card layout
-Calculated restaurant score fallback
-Resilient TOP-5 menu extraction
-Improved period charts and empty states
-Payment source shown as not connected
+Explainable restaurant score
+Director management summary
+Decision center
+Current pace forecast
+No simulated payment or active-order data

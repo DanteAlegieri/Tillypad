@@ -281,53 +281,207 @@ function calculateRestaurantScore({
   checksDelta,
   classC,
 }){
-  if(!hasData) return null;
+  if(!hasData) return {score:null,factors:[]};
 
   let score=65;
+  const factors=[
+    {
+      title:"Базовая оценка",
+      description:"Стартовая оценка при наличии продаж",
+      points:65,
+    },
+  ];
 
-  if(online) score+=15;
-  else score-=15;
+  const apply=(title,description,points)=>{
+    score+=points;
+    factors.push({title,description,points});
+  };
+
+  apply(
+    "Связь с рестораном",
+    online?"Агент передаёт свежие данные":"Агент не в сети",
+    online?15:-15
+  );
 
   if(revenueDelta.raw!==null){
-    if(revenueDelta.raw>=10) score+=12;
-    else if(revenueDelta.raw>=0) score+=7;
-    else if(revenueDelta.raw>=-10) score-=5;
-    else if(revenueDelta.raw>=-25) score-=12;
-    else score-=22;
+    let points=0;
+    if(revenueDelta.raw>=10) points=12;
+    else if(revenueDelta.raw>=0) points=7;
+    else if(revenueDelta.raw>=-10) points=-5;
+    else if(revenueDelta.raw>=-25) points=-12;
+    else points=-22;
+
+    apply(
+      "Динамика выручки",
+      `${revenueDelta.raw>=0?"Рост":"Снижение"} ${Math.abs(revenueDelta.raw).toFixed(1)}%`,
+      points
+    );
   }
 
   if(averageDelta.raw!==null){
-    if(averageDelta.raw>=5) score+=8;
-    else if(averageDelta.raw>=0) score+=4;
-    else if(averageDelta.raw>=-10) score-=5;
-    else score-=12;
+    let points=0;
+    if(averageDelta.raw>=5) points=8;
+    else if(averageDelta.raw>=0) points=4;
+    else if(averageDelta.raw>=-10) points=-5;
+    else points=-12;
+
+    apply(
+      "Средний чек",
+      `${averageDelta.raw>=0?"Рост":"Снижение"} ${Math.abs(averageDelta.raw).toFixed(1)}%`,
+      points
+    );
   }
 
   if(checksDelta.raw!==null){
-    if(checksDelta.raw>=5) score+=6;
-    else if(checksDelta.raw< -15) score-=8;
+    let points=0;
+    if(checksDelta.raw>=5) points=6;
+    else if(checksDelta.raw< -15) points=-8;
+
+    apply(
+      "Количество чеков",
+      `${checksDelta.raw>=0?"Рост":"Снижение"} ${Math.abs(checksDelta.raw).toFixed(1)}%`,
+      points
+    );
   }
 
   const weakItems=Number(classC);
   if(Number.isFinite(weakItems)){
-    if(weakItems===0) score+=4;
-    else if(weakItems<=5) score+=1;
-    else if(weakItems>=15) score-=6;
+    let points=0;
+    if(weakItems===0) points=4;
+    else if(weakItems<=5) points=1;
+    else if(weakItems>=15) points=-6;
+
+    apply(
+      "Структура меню",
+      weakItems===0?"Нет слабых позиций":`${weakItems} позиций класса C`,
+      points
+    );
   }
 
-  return Math.max(0,Math.min(100,Math.round(score)));
+  return {
+    score:Math.max(0,Math.min(100,Math.round(score))),
+    factors,
+  };
 }
 
-function setPeriodInUrl(){
-  const url=new URL(window.location.href);
-  url.searchParams.set("period",period);
-  history.replaceState({period},"",url);
+function calculateForecast(currentRevenue,periodName){
+  if(periodName!=="today") return currentRevenue;
+
+  const now=new Date();
+  const hour=now.getHours()+now.getMinutes()/60;
+  const serviceStart=10;
+  const serviceEnd=22;
+  const elapsed=Math.max(.5,Math.min(serviceEnd-serviceStart,hour-serviceStart));
+  const fullDay=serviceEnd-serviceStart;
+
+  if(hour<=serviceStart) return currentRevenue;
+  return Math.round(currentRevenue*(fullDay/elapsed));
 }
 
-function activatePeriodButton(){
-  document.querySelectorAll("[data-period]").forEach(button=>{
-    button.classList.toggle("is-active",button.dataset.period===period);
-  });
+function buildDecisions({
+  online,
+  hasData,
+  revenueDelta,
+  averageDelta,
+  checksDelta,
+  classC,
+  leader,
+}){
+  const decisions=[];
+
+  if(!online){
+    decisions.push({
+      severity:"critical",
+      title:"Восстановить связь с агентом",
+      text:"Без свежих данных прогноз и рекомендации могут быть неточными.",
+      meta:"Приоритет 1",
+      effect:"Надёжность данных",
+    });
+  }
+
+  if(hasData&&checksDelta.raw!==null&&checksDelta.raw<-15){
+    decisions.push({
+      severity:"critical",
+      title:"Увеличить поток чеков",
+      text:"Количество заказов снизилось сильнее среднего чека. Основная проблема — поток гостей.",
+      meta:"Приоритет 1",
+      effect:`Чеки ${checksDelta.raw.toFixed(1)}%`,
+    });
+  }
+
+  if(hasData&&averageDelta.raw!==null&&averageDelta.raw<-5){
+    decisions.push({
+      severity:"warning",
+      title:"Усилить допродажи",
+      text:"Добавляйте напиток или гарнир к основным позициям.",
+      meta:"Приоритет 2",
+      effect:`Средний чек ${averageDelta.raw.toFixed(1)}%`,
+    });
+  }
+
+  if(hasData&&revenueDelta.raw!==null&&revenueDelta.raw<-10){
+    decisions.push({
+      severity:"warning",
+      title:"Поддержать продажи в слабые часы",
+      text:`Используйте лидера продаж «${leader}» в акции или комбо.`,
+      meta:"Приоритет 2",
+      effect:`Выручка ${revenueDelta.raw.toFixed(1)}%`,
+    });
+  }
+
+  const weakItems=Number(classC);
+  if(Number.isFinite(weakItems)&&weakItems>10){
+    decisions.push({
+      severity:"warning",
+      title:"Проверить слабые позиции меню",
+      text:`В классе C находится ${weakItems} позиций. Их стоит убрать, изменить или объединить в комбо.`,
+      meta:"Приоритет 3",
+      effect:"Оптимизация меню",
+    });
+  }
+
+  if(!decisions.length){
+    decisions.push({
+      severity:"ok",
+      title:"Сохранять текущий темп",
+      text:"Критических отклонений нет. Контролируйте наличие лидеров продаж.",
+      meta:"Норма",
+      effect:"Стабильная работа",
+    });
+  }
+
+  return decisions.slice(0,3);
+}
+
+function renderDecisions(decisions){
+  setHtml("decision-center",
+    decisions.map(item=>`
+      <article class="decision-card ${item.severity}">
+        <strong>${item.title}</strong>
+        <p>${item.text}</p>
+        <div class="decision-card__meta">
+          <span>${item.meta}</span>
+          <span>${item.effect}</span>
+        </div>
+      </article>
+    `).join("")
+  );
+}
+
+function renderScoreBreakdown(factors){
+  setHtml("score-breakdown",
+    factors.map(item=>`
+      <div class="score-factor">
+        <div>
+          <b>${item.title}</b>
+          <small>${item.description}</small>
+        </div>
+        <b class="${item.points>=0?"positive":"negative"}">
+          ${item.points>=0?"+":""}${item.points}
+        </b>
+      </div>
+    `).join("")
+  );
 }
 
 async function initialize(){
@@ -350,6 +504,22 @@ async function initialize(){
       loadDashboard();
     };
   });
+
+  const scoreModal=byId("score-modal");
+  const scoreOpen=byId("score-details-button");
+  const scoreClose=byId("score-modal-close");
+
+  if(scoreOpen&&scoreModal){
+    scoreOpen.onclick=()=>{scoreModal.hidden=false};
+  }
+  if(scoreClose&&scoreModal){
+    scoreClose.onclick=()=>{scoreModal.hidden=true};
+  }
+  if(scoreModal){
+    scoreModal.onclick=event=>{
+      if(event.target===scoreModal) scoreModal.hidden=true;
+    };
+  }
 
   activatePeriodButton();
   setPeriodInUrl();
@@ -390,7 +560,7 @@ async function loadDashboard(){
   setText("revenue",money(current.revenue));
   setText("average",money(average));
   setText("checks",integer(current.checks));
-  setText("forecast",money(current.revenue));
+  setText("forecast",money(calculateForecast(current.revenue,period)));
 
   setDelta("revenue-delta",revenueDelta);
   setDelta("average-delta",averageDelta);
@@ -399,7 +569,7 @@ async function loadDashboard(){
   const hasCurrentData=current.checks>0||current.revenue>0;
   const online=Boolean(status?.online||status?.connected||status?.status==="online");
   const classC=menu?.abc?.C?.count??menu?.class_c_count??null;
-  const calculatedScore=calculateRestaurantScore({
+  const scoreResult=calculateRestaurantScore({
     hasData:hasCurrentData,
     online,
     revenueDelta,
@@ -410,7 +580,9 @@ async function loadDashboard(){
   const backendScore=report?.health_score?.score??report?.score;
   const score=Number.isFinite(Number(backendScore))
     ?Math.round(Number(backendScore))
-    :calculatedScore;
+    :scoreResult.score;
+
+  renderScoreBreakdown(scoreResult.factors);
 
   setText("score",score===null?"—":score);
 
@@ -449,6 +621,16 @@ async function loadDashboard(){
 
   const leaders=topItems(menu);
   const leader=leaders.length?itemName(leaders[0]):"Не определён";
+  const decisions=buildDecisions({
+    online,
+    hasData:hasCurrentData,
+    revenueDelta,
+    averageDelta,
+    checksDelta,
+    classC,
+    leader,
+  });
+  renderDecisions(decisions);
 
   setText("leader",leader);
   setText("peak-hour",latest?.peak_hour||"Нет данных");
@@ -480,9 +662,11 @@ async function loadDashboard(){
         ? `выручка выше прошлого периода на ${Math.abs(revenueDelta.raw).toFixed(1)}%`
         : `выручка ниже прошлого периода на ${Math.abs(revenueDelta.raw).toFixed(1)}%`;
 
-    if(heroTitle) heroTitle.textContent=`${presentation.hero} ресторан сформировал ${money(current.revenue)}`;
+    const flowProblem=checksDelta.raw!==null&&checksDelta.raw<averageDelta.raw;
+    if(heroTitle) heroTitle.textContent=`${presentation.hero} выручка составила ${money(current.revenue)}`;
     if(heroText) heroText.innerHTML=
-      `Чеков — <b>${integer(current.checks)}</b>, средний чек — <b>${money(average)}</b>; ${deltaText}. `+
+      `Оформлено <b>${integer(current.checks)}</b> чеков, средний чек — <b>${money(average)}</b>; ${deltaText}. `+
+      `${flowProblem?"Основная проблема — снижение количества заказов.":"Основная динамика связана со средним чеком."} `+
       `Лидер продаж — <b>${leader}</b>.`;
   }
 

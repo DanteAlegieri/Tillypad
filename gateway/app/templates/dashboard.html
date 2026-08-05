@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ product_name }}</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<link rel="stylesheet" href="/static/css/dashboard.css?v=8.2.0">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=9.0.0">
 </head>
 <body>
 <div class="layout">
@@ -52,6 +52,7 @@
    <small>Индекс ресторана</small>
    <b id="score">—</b>
    <span id="score-status" class="muted">Нет данных</span>
+   <button class="score-details-button" id="score-details-button" type="button">Почему такая оценка</button>
   </div>
  </section>
 
@@ -98,6 +99,16 @@
   </div>
  </section>
 
+ <section class="card panel decision-center">
+  <div class="panel-head">
+   <h3>Что сделать сейчас</h3>
+   <span>приоритетные решения</span>
+  </div>
+  <div id="decision-center" class="decision-list">
+   <div class="empty">Формирую решения…</div>
+  </div>
+ </section>
+
  <section class="grid-main">
   <div class="card panel">
    <div class="panel-head"><h3>ТОП продаж</h3><span>пять позиций</span></div>
@@ -113,6 +124,16 @@
 </main>
 </div>
 
-<script src="/static/js/dashboard.js?v=8.2.0"></script>
+<script src="/static/js/dashboard.js?v=9.0.0"></script>
+<div class="modal-backdrop" id="score-modal" hidden>
+ <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="score-modal-title">
+  <div class="modal-header">
+   <h3 id="score-modal-title">Из чего складывается индекс</h3>
+   <button type="button" id="score-modal-close" class="modal-close">×</button>
+  </div>
+  <div id="score-breakdown" class="score-breakdown"></div>
+ </div>
+</div>
+
 </body>
 </html>

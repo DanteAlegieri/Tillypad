@@ -1,8 +1,7 @@
-Restaurant OS 9.0.0 Digital Director
-Gateway 9.0.0
+Restaurant OS 9.1.0 Modular Frontend Hotfix
+Gateway 9.1.0
 Agent 31.1.0
-Explainable restaurant score
-Director management summary
-Decision center
-Current pace forecast
-No simulated payment or active-order data
+Fix activatePeriodButton is not defined
+Fix setPeriodInUrl missing definition
+Dashboard loaded as ES module
+Period controls extracted to separate module

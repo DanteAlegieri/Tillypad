@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from fastapi.staticfiles import StaticFiles
 from fastapi import (
     Depends,
     FastAPI,
@@ -28,12 +29,14 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Restaurant Gateway",
-    version="4.4.0",
+    version="8.0.1",
 )
 storage = GatewayStorage(settings.database_path)
 event_repository = SQLiteEventRepository(settings.database_path)
 event_engine = EventEngine(event_repository)
 connections = ConnectionManager()
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
 app.include_router(setup_dashboard_routes(storage, connections, event_repository))
 
 
@@ -68,7 +71,7 @@ def health() -> dict:
     return {
         "ok": True,
         "service": "restaurant-gateway",
-        "version": "4.4.0",
+        "version": "8.0.1",
         "online_agents": len(connections.connections),
     }
 

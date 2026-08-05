@@ -1,9 +1,5 @@
-Restaurant OS 4.4.0
-Gateway 4.4.0
+Restaurant OS 8.0.1 Foundation Hotfix
+Gateway 8.0.1
 Agent 31.0.0
-Transport 2.0
-Added application heartbeat pong
-Added snapshot acknowledgement
-Added snapshot error response
-Cloud snapshot errors no longer close WebSocket
-Transport ping: 15s, timeout: 45s
+Fix: add Jinja2 to gateway runtime dependencies
+Dashboard templates/static architecture retained

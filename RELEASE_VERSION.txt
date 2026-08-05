@@ -1,8 +1,6 @@
-Restaurant OS 8.1.2 Clean Git Release
-Gateway 8.1.2
+Restaurant OS 8.1.3 Frontend Stability Hotfix
+Gateway 8.1.3
 Agent 31.1.0
-Single source of truth release
+Safe DOM updates for all dashboard fields
+Static asset cache busting
 Smart periods retained
-Jinja2/templates/static retained
-DOM hotfix retained
-Deploy CRLF normalization retained

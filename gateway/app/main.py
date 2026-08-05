@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Restaurant Gateway",
-    version="8.1.2",
+    version="8.1.3",
 )
 storage = GatewayStorage(settings.database_path)
 event_repository = SQLiteEventRepository(settings.database_path)
@@ -71,7 +71,7 @@ def health() -> dict:
     return {
         "ok": True,
         "service": "restaurant-gateway",
-        "version": "8.1.2",
+        "version": "8.1.3",
         "online_agents": len(connections.connections),
     }
 

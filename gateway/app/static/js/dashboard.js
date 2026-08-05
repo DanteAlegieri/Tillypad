@@ -37,6 +37,11 @@ const setClass=(id,value)=>{
   const node=byId(id);
   if(node) node.className=value;
 };
+const query=selector=>document.querySelector(selector);
+const setQueryText=(selector,value)=>{
+  const node=query(selector);
+  if(node) node.textContent=value;
+};
 
 function monthName(monthIndex){
   return [
@@ -243,7 +248,7 @@ async function loadDashboard(){
   const range=ranges();
   const presentation=periodPresentation(range);
 
-  document.querySelector(".workspace-header h1").textContent=presentation.title;
+  setQueryText(".workspace-header h1",presentation.title);
   setText("date-title",presentation.subtitle);
   setText("chart-caption",presentation.subtitle);
   setText("revenue-label",presentation.revenue);
@@ -270,10 +275,10 @@ async function loadDashboard(){
   const averageDelta=comparison(average,previousAverage);
   const checksDelta=comparison(current.checks,previous.checks);
 
-  document.getElementById("revenue").textContent=money(current.revenue);
-  document.getElementById("average").textContent=money(average);
-  document.getElementById("checks").textContent=integer(current.checks);
-  document.getElementById("forecast").textContent=money(current.revenue);
+  setText("revenue",money(current.revenue));
+  setText("average",money(average));
+  setText("checks",integer(current.checks));
+  setText("forecast",money(current.revenue));
 
   setDelta("revenue-delta",revenueDelta);
   setDelta("average-delta",averageDelta);
@@ -281,46 +286,60 @@ async function loadDashboard(){
 
   const hasCurrentData=current.checks>0||current.revenue>0;
   const score=report?.health_score?.score??report?.score??0;
-  document.getElementById("score").textContent=hasCurrentData&&score?score:"—";
+  setText("score",hasCurrentData&&score?score:"—");
 
-  const scoreNode=document.getElementById("score-status");
-  if(!hasCurrentData){
+  const scoreNode=byId("score-status");
+  if(scoreNode&&!hasCurrentData){
     scoreNode.textContent="Нет данных за период";
     scoreNode.className="text-muted";
-  }else{
+  }else if(scoreNode){
     scoreNode.textContent=score>=80?"Хорошее состояние":score>=60?"Требует внимания":"Высокий риск";
     scoreNode.className=score>=80?"text-good":score>=60?"text-warn":"text-bad";
   }
 
   const online=Boolean(status?.online||status?.connected||status?.status==="online");
-  document.getElementById("agent-state").innerHTML=
-    `<i class="status-dot" style="background:${online?"var(--color-green)":"var(--color-red)"}"></i>${online?"Агент подключён":"Агент не в сети"}`;
+  setHtml(
+    "agent-state",
+    `<i class="status-dot" style="background:${online?"var(--color-green)":"var(--color-red)"}"></i>${online?"Агент подключён":"Агент не в сети"}`
+  );
 
-  document.getElementById("sync-state").textContent=
-    `Синхронизация: ${localTime(latest?.captured_at||latest?.created_at)}`;
-  document.getElementById("last-seen").textContent=
-    localTime(status?.last_seen_at||status?.last_heartbeat_at);
-  document.getElementById("last-sync").textContent=
-    localTime(latest?.captured_at||latest?.created_at);
+  setText(
+    "sync-state",
+    `Синхронизация: ${localTime(latest?.captured_at||latest?.created_at)}`
+  );
+  setText(
+    "last-seen",
+    localTime(status?.last_seen_at||status?.last_heartbeat_at)
+  );
+  setText(
+    "last-sync",
+    localTime(latest?.captured_at||latest?.created_at)
+  );
 
   const leaders=topItems(menu);
   const leader=leaders[0]?.item_name||leaders[0]?.name||"Не определён";
 
-  document.getElementById("leader").textContent=leader;
-  document.getElementById("peak-hour").textContent=latest?.peak_hour||"Нет данных";
-  document.getElementById("class-c").textContent=
-    menu?.abc?.C?.count??menu?.class_c_count??"Нет данных";
-  document.getElementById("last-check").textContent=
-    latest?.last_check_at?localTime(latest.last_check_at):"Нет данных";
-  document.getElementById("data-health").textContent=
-    online?"Данные поступают":"Требуется проверка";
+  setText("leader",leader);
+  setText("peak-hour",latest?.peak_hour||"Нет данных");
+  setText(
+    "class-c",
+    menu?.abc?.C?.count??menu?.class_c_count??"Нет данных"
+  );
+  setText(
+    "last-check",
+    latest?.last_check_at?localTime(latest.last_check_at):"Нет данных"
+  );
+  setText(
+    "data-health",
+    online?"Данные поступают":"Требуется проверка"
+  );
 
-  const heroTitle=document.getElementById("hero-title");
-  const heroText=document.getElementById("hero-text");
+  const heroTitle=byId("hero-title");
+  const heroText=byId("hero-text");
 
   if(!hasCurrentData){
-    heroTitle.textContent=`За выбранный период данных пока нет`;
-    heroText.innerHTML=
+    if(heroTitle) heroTitle.textContent=`За выбранный период данных пока нет`;
+    if(heroText) heroText.innerHTML=
       `${presentation.subtitle}. Последняя синхронизация: <b>${localTime(latest?.captured_at||latest?.created_at)}</b>. `+
       `Для прошлых месяцев агент должен один раз выполнить загрузку истории.`;
   }else{
@@ -330,8 +349,8 @@ async function loadDashboard(){
         ? `выручка выше прошлого периода на ${Math.abs(revenueDelta.raw).toFixed(1)}%`
         : `выручка ниже прошлого периода на ${Math.abs(revenueDelta.raw).toFixed(1)}%`;
 
-    heroTitle.textContent=`${presentation.hero} ресторан сформировал ${money(current.revenue)}`;
-    heroText.innerHTML=
+    if(heroTitle) heroTitle.textContent=`${presentation.hero} ресторан сформировал ${money(current.revenue)}`;
+    if(heroText) heroText.innerHTML=
       `Чеков — <b>${integer(current.checks)}</b>, средний чек — <b>${money(average)}</b>; ${deltaText}. `+
       `Лидер продаж — <b>${leader}</b>.`;
   }
@@ -390,10 +409,10 @@ function renderAttention(events,revenueDelta,averageDelta,online,menu,hasData){
     });
   }
 
-  document.getElementById("attention").innerHTML=
+  setHtml("attention",
     items.slice(0,5).map(x=>
       `<article class="issue"><b>${x.title}</b><p>${x.text}</p></article>`
-    ).join("");
+    ).join(""));
 }
 
 function renderRecommendations(revenueDelta,averageDelta,menu,hasData){
@@ -435,17 +454,17 @@ function renderRecommendations(revenueDelta,averageDelta,menu,hasData){
     });
   }
 
-  document.getElementById("recommendations").innerHTML=
+  setHtml("recommendations",
     items.slice(0,4).map(x=>
       `<article class="recommendation"><b>${x.title}</b><p>${x.text}</p></article>`
-    ).join("");
+    ).join(""));
 }
 
 function renderLeaders(items){
-  document.getElementById("leaders").innerHTML=
+  setHtml("leaders",
     items.slice(0,5).map((x,i)=>
       `<div><span>${i+1}. ${x.item_name||x.name||"Без названия"}</span><strong>${money(x.revenue||0)}</strong></div>`
-    ).join("")||'<div class="empty">Нет данных</div>';
+    ).join("")||'<div class="empty">Нет данных</div>');
 }
 
 function renderChart(historyRows,latest){
@@ -465,7 +484,9 @@ function renderChart(historyRows,latest){
     });
   }
 
-  const chart=echarts.init(document.getElementById("sales-chart"));
+  const chartNode=byId("sales-chart");
+  if(!chartNode||typeof echarts==="undefined") return;
+  const chart=echarts.init(chartNode);
   chart.setOption({
     grid:{left:48,right:14,top:18,bottom:34},
     tooltip:{trigger:"axis"},

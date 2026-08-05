@@ -6,7 +6,7 @@
 
     [string]$RemotePath = "/opt/restaurantos/gateway",
 
-    [string]$ExpectedVersion = "9.4.0",
+    [string]$ExpectedVersion = "10.0.0",
 
     [string]$SshKey = "",
 
@@ -168,18 +168,32 @@ $RemoteScript | & ssh @CommonSshArgs $Target "bash -s"
         throw "Ошибка развёртывания Gateway на VPS."
     }
 
-    Write-Host "[6/7] Ожидание запуска..." -ForegroundColor Yellow
-    Start-Sleep -Seconds 4
+    Write-Host "[6/7] Ожидание READY..." -ForegroundColor Yellow
 
-    $HealthJson = & ssh @CommonSshArgs $Target `
-        "curl --fail --silent http://127.0.0.1:8020/health"
-    if ($LASTEXITCODE -ne 0) {
-        throw "Gateway запущен, но /health не отвечает."
+    $Health = $null
+    for ($Attempt = 1; $Attempt -le 30; $Attempt++) {
+        $HealthJson = & ssh @CommonSshArgs $Target `
+            "curl -fsS http://127.0.0.1:8020/health 2>/dev/null"
+
+        if ($LASTEXITCODE -eq 0 -and $HealthJson) {
+            try {
+                $Health = $HealthJson | ConvertFrom-Json
+                if ($Health.ok) { break }
+            }
+            catch {
+                $Health = $null
+            }
+        }
+
+        Write-Host "  Попытка $Attempt/30..." -ForegroundColor DarkGray
+        Start-Sleep -Seconds 1
     }
 
-    $Health = $HealthJson | ConvertFrom-Json
-    if (-not $Health.ok) {
-        throw "Gateway вернул отрицательный health status."
+    if (-not $Health -or -not $Health.ok) {
+        Write-Host "Последние логи Gateway:" -ForegroundColor Red
+        & ssh @CommonSshArgs $Target `
+            "docker logs restaurant-gateway --tail=80 2>&1"
+        throw "Gateway не вышел в READY за 30 секунд."
     }
 
     if ([string]$Health.version -ne $ExpectedVersion) {

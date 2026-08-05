@@ -1,0 +1,18 @@
+{% macro restaurant_sidebar(active_page, app_version) -%}
+<aside class="sidebar">
+ <div class="brand"><div class="brand-badge">R</div><div><strong>Restaurant OS</strong><small>Director workspace</small></div></div>
+ <nav class="nav">
+  <div class="nav-title">Рабочий стол</div>
+  <a class="{{ 'active' if active_page == 'today' else '' }}" href="/dashboard"><i>⌂</i><span>Сегодня</span></a>
+  <a href="/dashboard-old"><i>◫</i><span>Старая панель</span></a>
+  <div class="nav-title">Управление</div>
+  <a href="/dashboard-old"><i>◆</i><span>Центр решений</span></a>
+  <a href="/dashboard-old"><i>◒</i><span>Меню</span></a>
+  <a href="/dashboard-old"><i>₽</i><span>Финансы</span></a>
+  <a href="/dashboard-old"><i>→</i><span>Доставка</span></a>
+  <div class="nav-title">Система</div>
+  <a class="{{ 'active' if active_page == 'settings' else '' }}" href="/settings"><i>⚙</i><span>Настройки</span></a>
+ </nav>
+ <div class="version">Restaurant OS {{ app_version }}</div>
+</aside>
+{%- endmacro %}

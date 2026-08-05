@@ -4,27 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ product_name }} — настройки</title>
-<link rel="stylesheet" href="/static/css/dashboard.css?v=9.4.0">
-<link rel="stylesheet" href="/static/css/settings.css?v=9.4.0">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.0.0">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.0.0">
+<link rel="stylesheet" href="/static/css/settings.css?v=10.0.0">
 </head>
+{% from 'components/sidebar.html' import restaurant_sidebar %}
 <body>
 <div class="layout">
-<aside class="sidebar">
- <div class="brand"><div class="brand-badge">R</div><div><strong>Restaurant OS</strong><small>Director workspace</small></div></div>
- <nav class="nav">
-  <div class="nav-title">Рабочий стол</div>
-  <a href="/dashboard"><i>⌂</i><span>Сегодня</span></a>
-  <a href="/dashboard-old"><i>◫</i><span>Старая панель</span></a>
-  <div class="nav-title">Управление</div>
-  <a href="/dashboard-old"><i>◆</i><span>Центр решений</span></a>
-  <a href="/dashboard-old"><i>◒</i><span>Меню</span></a>
-  <a href="/dashboard-old"><i>₽</i><span>Финансы</span></a>
-  <a href="/dashboard-old"><i>→</i><span>Доставка</span></a>
-  <div class="nav-title">Система</div>
-  <a class="active" href="/settings"><i>⚙</i><span>Настройки</span></a>
- </nav>
- <div class="version">Restaurant OS {{ app_version }}</div>
-</aside>
+{{ restaurant_sidebar('settings', app_version) }}
 
 <main>
  <header class="topbar settings-topbar">
@@ -88,6 +75,6 @@
 </main>
 </div>
 
-<script type="module" src="/static/js/settings.js?v=9.4.0"></script>
+<script type="module" src="/static/js/settings.js?v=10.0.0"></script>
 </body>
 </html>

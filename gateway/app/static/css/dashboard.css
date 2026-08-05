@@ -370,3 +370,11 @@ select,.pill{border:1px solid var(--line);background:#fff;border-radius:10px;pad
   }
   .plan-panel__result{text-align:left}
 }
+
+:root{
+--bg:var(--ros-color-bg);--surface:var(--ros-color-surface);--text:var(--ros-color-text);
+--muted:var(--ros-color-muted);--line:var(--ros-color-border);--blue:var(--ros-color-primary);
+--green:var(--ros-color-success);--amber:var(--ros-color-warning);--red:var(--ros-color-danger);
+--violet:var(--ros-color-ai);--sidebar:var(--ros-color-sidebar);
+}
+.card{border-color:var(--ros-color-border);border-radius:var(--ros-radius-lg);box-shadow:var(--ros-shadow-card)}

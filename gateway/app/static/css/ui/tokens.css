@@ -1,0 +1,14 @@
+:root{
+--ros-color-bg:#f4f6f8;--ros-color-surface:#fff;--ros-color-soft:#f8f9fb;
+--ros-color-text:#17191d;--ros-color-muted:#747b86;--ros-color-border:#e6e9ed;
+--ros-color-primary:#2676a0;--ros-color-success:#198754;
+--ros-color-warning:#c77a1c;--ros-color-danger:#c53d35;
+--ros-color-ai:#7357b8;--ros-color-sidebar:#15181d;
+--ros-space-1:4px;--ros-space-2:8px;--ros-space-3:12px;--ros-space-4:16px;
+--ros-space-5:20px;--ros-space-6:24px;--ros-space-8:32px;
+--ros-radius-sm:8px;--ros-radius-md:12px;--ros-radius-lg:16px;--ros-radius-xl:20px;
+--ros-shadow-card:0 8px 28px rgba(16,24,40,.05);
+--ros-shadow-modal:0 24px 80px rgba(15,23,42,.24);
+--ros-font-ui:Inter,"Segoe UI",Arial,sans-serif;
+--ros-sidebar-width:226px;--ros-transition-fast:160ms ease;
+}

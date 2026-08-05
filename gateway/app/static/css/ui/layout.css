@@ -1,0 +1,6 @@
+.ros-shell{display:grid;grid-template-columns:var(--ros-sidebar-width) minmax(0,1fr);min-height:100vh}
+.ros-content{min-width:0}.ros-page{max-width:1540px;width:100%;margin:auto;padding:22px 27px 48px}
+.ros-page-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+.ros-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ros-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:1050px){.ros-shell{grid-template-columns:74px 1fr}}
+@media(max-width:740px){.ros-shell{display:block}.ros-page{padding:13px}.ros-grid-2,.ros-grid-4{grid-template-columns:1fr}}

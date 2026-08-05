@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ product_name }}</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<link rel="stylesheet" href="/static/css/dashboard.css?v=9.2.0">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=9.4.0">
 </head>
 <body>
 <div class="layout">
@@ -21,6 +21,8 @@
   <a href="/dashboard-old"><i>◒</i><span>Меню</span></a>
   <a href="/dashboard-old"><i>₽</i><span>Финансы</span></a>
   <a href="/dashboard-old"><i>→</i><span>Доставка</span></a>
+  <div class="nav-title">Система</div>
+  <a href="/settings"><i>⚙</i><span>Настройки</span></a>
  </nav>
  <div class="version">Restaurant OS {{ app_version }}</div>
 </aside>
@@ -52,6 +54,7 @@
    <small>Индекс ресторана</small>
    <b id="score">—</b>
    <span id="score-status" class="muted">Нет данных</span>
+   <div class="score-main-reason" id="score-main-reason">Ожидаю показатели</div>
    <button class="score-details-button" id="score-details-button" type="button">Почему такая оценка</button>
   </div>
  </section>
@@ -61,6 +64,26 @@
   <div class="card kpi"><small id="average-label">Средний чек сегодня</small><b id="average">—</b><div id="average-delta" class="delta muted">—</div></div>
   <div class="card kpi"><small id="checks-label">Чеков сегодня</small><b id="checks">—</b><div id="checks-delta" class="delta muted">—</div></div>
   <div class="card kpi"><small id="forecast-label">Прогноз дня</small><b id="forecast">—</b><div class="delta muted">по текущему темпу</div></div>
+ </section>
+
+ <section class="card plan-panel">
+  <div class="plan-panel__head">
+   <div>
+    <small id="plan-period-label">План на сегодня</small>
+    <strong><span id="plan-fact">—</span> из <span id="plan-target">—</span></strong>
+   </div>
+   <div class="plan-panel__result">
+    <b id="plan-percent">—</b>
+    <span id="plan-status">Ожидаю данные</span>
+   </div>
+  </div>
+  <div class="plan-progress">
+   <span id="plan-progress-fill"></span>
+  </div>
+  <div class="plan-panel__footer">
+   <span id="plan-gap">До плана: —</span>
+   <span id="plan-forecast-status">Прогноз: —</span>
+  </div>
  </section>
 
  <section class="grid-main">
@@ -131,7 +154,7 @@
 </main>
 </div>
 
-<script type="module" src="/static/js/dashboard/init.js?v=9.2.0"></script>
+<script type="module" src="/static/js/dashboard/init.js?v=9.4.0"></script>
 <div class="modal-backdrop" id="score-modal" hidden>
  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="score-modal-title">
   <div class="modal-header">

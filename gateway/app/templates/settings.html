@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ product_name }} — настройки</title>
+<link rel="stylesheet" href="/static/css/dashboard.css?v=9.4.0">
+<link rel="stylesheet" href="/static/css/settings.css?v=9.4.0">
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+ <div class="brand"><div class="brand-badge">R</div><div><strong>Restaurant OS</strong><small>Director workspace</small></div></div>
+ <nav class="nav">
+  <div class="nav-title">Рабочий стол</div>
+  <a href="/dashboard"><i>⌂</i><span>Сегодня</span></a>
+  <a href="/dashboard-old"><i>◫</i><span>Старая панель</span></a>
+  <div class="nav-title">Управление</div>
+  <a href="/dashboard-old"><i>◆</i><span>Центр решений</span></a>
+  <a href="/dashboard-old"><i>◒</i><span>Меню</span></a>
+  <a href="/dashboard-old"><i>₽</i><span>Финансы</span></a>
+  <a href="/dashboard-old"><i>→</i><span>Доставка</span></a>
+  <div class="nav-title">Система</div>
+  <a class="active" href="/settings"><i>⚙</i><span>Настройки</span></a>
+ </nav>
+ <div class="version">Restaurant OS {{ app_version }}</div>
+</aside>
+
+<main>
+ <header class="topbar settings-topbar">
+  <div>
+   <h1>Настройки</h1>
+   <p>Параметры ресторана и управленческой аналитики</p>
+  </div>
+  <select id="settings-agent-select"></select>
+ </header>
+
+ <section class="settings-layout">
+  <aside class="card settings-menu">
+   <strong>Разделы</strong>
+   <button class="is-active" type="button">Общие настройки</button>
+   <button type="button" disabled>Индекс ресторана <span>позже</span></button>
+   <button type="button" disabled>ИИ и рекомендации <span>позже</span></button>
+   <button type="button" disabled>Агент <span>позже</span></button>
+  </aside>
+
+  <section class="card settings-card">
+   <div class="settings-card__head">
+    <div>
+     <span class="eyebrow">Общие настройки</span>
+     <h2>План выручки</h2>
+     <p>Этот показатель используется на экране «Сегодня», в прогнозе и центре решений.</p>
+    </div>
+    <span id="settings-status" class="settings-status">Загрузка…</span>
+   </div>
+
+   <form id="settings-form">
+    <label for="daily-revenue-plan">Дневной план выручки</label>
+    <div class="money-input">
+     <input
+      id="daily-revenue-plan"
+      name="daily_revenue_plan"
+      type="number"
+      min="0"
+      max="100000000"
+      step="100"
+      required
+     >
+     <span>₽</span>
+    </div>
+    <small>
+     Для периода «7 дней» и месяцев система автоматически умножает дневной план на количество дней.
+    </small>
+
+    <div class="settings-preview">
+     <span>Предварительный вид</span>
+     <strong id="plan-preview">—</strong>
+     <small>план на один день</small>
+    </div>
+
+    <div class="settings-actions">
+     <a href="/dashboard" class="secondary-button">Вернуться на экран «Сегодня»</a>
+     <button type="submit" class="primary-button" id="save-settings">Сохранить</button>
+    </div>
+   </form>
+  </section>
+ </section>
+</main>
+</div>
+
+<script type="module" src="/static/js/settings.js?v=9.4.0"></script>
+</body>
+</html>

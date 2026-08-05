@@ -84,6 +84,12 @@ class GatewayStorage:
                 CREATE INDEX IF NOT EXISTS
                     idx_health_scores_agent_date
                 ON health_scores(agent_id, business_date, calculated_at);
+
+                CREATE TABLE IF NOT EXISTS restaurant_settings (
+                    agent_id TEXT PRIMARY KEY,
+                    daily_revenue_plan REAL NOT NULL DEFAULT 10000,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
             self._ensure_column(
@@ -139,6 +145,83 @@ class GatewayStorage:
     @staticmethod
     def hash_key(value: str) -> str:
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+    def get_restaurant_settings(
+        self,
+        agent_id: str,
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT agent_id, daily_revenue_plan, updated_at
+                FROM restaurant_settings
+                WHERE agent_id = ?
+                """,
+                (agent_id,),
+            ).fetchone()
+
+            if row is None:
+                now = utc_now()
+                connection.execute(
+                    """
+                    INSERT INTO restaurant_settings (
+                        agent_id,
+                        daily_revenue_plan,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?)
+                    """,
+                    (agent_id, 10000, now),
+                )
+                return {
+                    "agent_id": agent_id,
+                    "daily_revenue_plan": 10000,
+                    "updated_at": now,
+                }
+
+        return dict(row)
+
+    def update_restaurant_settings(
+        self,
+        agent_id: str,
+        *,
+        daily_revenue_plan: float,
+    ) -> dict[str, Any]:
+        plan = round(float(daily_revenue_plan), 2)
+        if plan < 0:
+            raise ValueError(
+                "Дневной план не может быть отрицательным"
+            )
+        if plan > 100_000_000:
+            raise ValueError(
+                "Дневной план слишком большой"
+            )
+
+        updated_at = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO restaurant_settings (
+                    agent_id,
+                    daily_revenue_plan,
+                    updated_at
+                )
+                VALUES (?, ?, ?)
+                ON CONFLICT(agent_id) DO UPDATE SET
+                    daily_revenue_plan =
+                        excluded.daily_revenue_plan,
+                    updated_at =
+                        excluded.updated_at
+                """,
+                (agent_id, plan, updated_at),
+            )
+
+        return {
+            "agent_id": agent_id,
+            "daily_revenue_plan": plan,
+            "updated_at": updated_at,
+        }
 
     def create_agent(
         self,

@@ -37,6 +37,57 @@ const isoLocal=d=>{
 const localTime=v=>v?new Date(v).toLocaleString("ru-RU",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"—";
 const api=async u=>{const r=await fetch(u);if(!r.ok)throw new Error(await r.text());return r.json()};
 
+let dailyRevenuePlan=10000;
+
+function daysInclusive(fromDate,toDate){
+  const start=new Date(fromDate.getFullYear(),fromDate.getMonth(),fromDate.getDate());
+  const end=new Date(toDate.getFullYear(),toDate.getMonth(),toDate.getDate());
+  return Math.max(1,Math.round((end-start)/86400000)+1);
+}
+
+function planForPeriod(periodName,range){
+  if(periodName==="today"||periodName==="yesterday") return dailyRevenuePlan;
+  return dailyRevenuePlan*daysInclusive(range.fromDate,range.toDate);
+}
+
+function percentOf(value,total){
+  if(!total) return 0;
+  return value/total*100;
+}
+
+function mainScoreReason(factors){
+  const negative=(factors||[])
+    .filter(item=>item.points<0)
+    .sort((a,b)=>a.points-b.points);
+
+  if(negative.length){
+    return {
+      title:negative[0].title,
+      description:negative[0].description,
+      points:negative[0].points,
+    };
+  }
+
+  const positive=(factors||[])
+    .filter(item=>item.points>0&&item.title!=="Базовая оценка")
+    .sort((a,b)=>b.points-a.points);
+
+  return positive[0]??null;
+}
+
+function leaderUnitPrice(item){
+  if(!item) return 0;
+  const quantity=itemQuantity(item);
+  const revenue=itemRevenue(item);
+  return quantity>0?revenue/quantity:revenue;
+}
+
+function salesNeeded(amount,unitPrice){
+  if(amount<=0) return 0;
+  if(unitPrice<=0) return null;
+  return Math.ceil(amount/unitPrice);
+}
+
 function cleanText(value){
   return String(value??"")
     .replace(/\uFFFD+/g,"")
@@ -449,8 +500,25 @@ function buildDecisions({
   checksDelta,
   classC,
   leader,
+  leaderItem,
+  currentRevenue,
+  forecastRevenue,
+  revenuePlan,
 }){
   const decisions=[];
+  const forecastGap=Math.max(0,revenuePlan-forecastRevenue);
+  const leaderPrice=leaderUnitPrice(leaderItem);
+  const requiredLeaderSales=salesNeeded(forecastGap,leaderPrice);
+
+  if(hasData&&forecastGap>0&&requiredLeaderSales!==null){
+    decisions.push({
+      severity:"critical",
+      title:"Закрыть разрыв до плана",
+      text:`При текущем темпе прогноз ниже плана на ${money(forecastGap)}. Для компенсации нужно примерно ${integer(requiredLeaderSales)} продаж позиции «${leader}».`,
+      meta:"Срочно",
+      effect:`До плана ${money(forecastGap)}`,
+    });
+  }
 
   if(!online){
     decisions.push({
@@ -532,9 +600,15 @@ function renderDecisions(decisions){
 }
 
 function renderScoreBreakdown(factors){
+  const reason=mainScoreReason(factors);
+
   setHtml("score-breakdown",
     factors.map(item=>`
-      <div class="score-factor">
+      <div class="score-factor ${
+        reason&&item.title===reason.title&&item.points===reason.points
+          ?"is-main"
+          :""
+      }">
         <div>
           <b>${item.title}</b>
           <small>${item.description}</small>
@@ -601,7 +675,7 @@ async function loadDashboard(){
   setText("checks-label",presentation.checks);
   setText("forecast-label",presentation.forecast);
 
-  const [historyRows,previousRows,status,latest,menu,report,events]=await Promise.all([
+  const [historyRows,previousRows,status,latest,menu,report,events,restaurantSettings]=await Promise.all([
     api(`/api/web/${agent}/sales/history?date_from=${range.from}&date_to=${range.to}`).catch(()=>[]),
     api(`/api/web/${agent}/sales/history?date_from=${range.pf}&date_to=${range.pt}`).catch(()=>[]),
     api(`/api/web/${agent}/status`).catch(()=>({})),
@@ -609,7 +683,12 @@ async function loadDashboard(){
     api(`/api/web/${agent}/menu/history?date_from=${range.from}&date_to=${range.to}`).catch(()=>({})),
     api(`/api/web/${agent}/ai/director?date_from=${range.from}&date_to=${range.to}&previous_from=${range.pf}&previous_to=${range.pt}`).catch(()=>null),
     api(`/api/web/${agent}/events?limit=40`).catch(()=>[]),
+    api(`/api/web/${agent}/settings`).catch(()=>({daily_revenue_plan:10000})),
   ]);
+
+  dailyRevenuePlan=Number(
+    restaurantSettings?.daily_revenue_plan??10000
+  );
 
   const current=aggregate(historyRows);
   const previous=aggregate(previousRows);
@@ -623,7 +702,45 @@ async function loadDashboard(){
   setText("revenue",money(current.revenue));
   setText("average",money(average));
   setText("checks",integer(current.checks));
-  setText("forecast",money(calculateForecast(current.revenue,period)));
+  const forecastRevenue=calculateForecast(current.revenue,period);
+  const revenuePlan=planForPeriod(period,range);
+  const planPercent=percentOf(current.revenue,revenuePlan);
+  const forecastPercent=percentOf(forecastRevenue,revenuePlan);
+  const planGap=Math.max(0,revenuePlan-current.revenue);
+  const forecastGap=Math.max(0,revenuePlan-forecastRevenue);
+
+  setText("forecast",money(forecastRevenue));
+  setText("plan-fact",money(current.revenue));
+  setText("plan-target",money(revenuePlan));
+  setText("plan-percent",`${Math.min(999,planPercent).toFixed(1)}%`);
+  setText(
+    "plan-status",
+    planPercent>=100?"План выполнен":planPercent>=70?"Близко к плану":"Требуется рост"
+  );
+  setText(
+    "plan-period-label",
+    period==="today"
+      ?"План на сегодня"
+      :period==="yesterday"
+        ?"План на вчера"
+        :"План за выбранный период"
+  );
+  setText(
+    "plan-gap",
+    planGap>0?`До плана: ${money(planGap)}`:`План превышен на ${money(current.revenue-revenuePlan)}`
+  );
+  setText(
+    "plan-forecast-status",
+    forecastGap>0
+      ?`Прогноз ниже плана на ${money(forecastGap)}`
+      :`Прогноз выполняет план на ${forecastPercent.toFixed(1)}%`
+  );
+
+  const planFill=byId("plan-progress-fill");
+  if(planFill){
+    planFill.style.width=`${Math.min(100,planPercent)}%`;
+    planFill.className=planPercent>=100?"good":planPercent>=70?"warning":"";
+  }
 
   setDelta("revenue-delta",revenueDelta);
   setDelta("average-delta",averageDelta);
@@ -649,6 +766,14 @@ async function loadDashboard(){
     :scoreResult.score;
 
   renderScoreBreakdown(scoreResult.factors);
+
+  const primaryScoreReason=mainScoreReason(scoreResult.factors);
+  setText(
+    "score-main-reason",
+    primaryScoreReason
+      ?`${primaryScoreReason.points<0?"▼":"▲"} ${primaryScoreReason.title}: ${primaryScoreReason.description}`
+      :"Критических факторов нет"
+  );
 
   setText("score",score===null?"—":score);
 
@@ -707,6 +832,10 @@ async function loadDashboard(){
     checksDelta,
     classC,
     leader,
+    leaderItem:leaders[0]??null,
+    currentRevenue:current.revenue,
+    forecastRevenue,
+    revenuePlan,
   });
   renderDecisions(decisions);
 
@@ -885,17 +1014,33 @@ function renderLeaders(items){
     .sort((a,b)=>itemRevenue(b)-itemRevenue(a))
     .slice(0,5);
 
+  const totalRevenue=sorted.reduce(
+    (sum,item)=>sum+itemRevenue(item),
+    0
+  );
+
   setHtml("leaders",
     sorted.length
       ?sorted.map((item,index)=>{
         const quantity=itemQuantity(item);
+        const revenue=itemRevenue(item);
+        const unitPrice=leaderUnitPrice(item);
+        const share=percentOf(revenue,totalRevenue);
+
         return `<div class="leader-row">
-          <span class="leader-row__rank">${index+1}</span>
-          <span class="leader-row__name">${itemName(item)}</span>
-          <span class="leader-row__meta">
-            <b>${money(itemRevenue(item))}</b>
-            ${quantity?`<small>${integer(quantity)} продаж</small>`:""}
-          </span>
+          <span class="leader-row__share" style="width:${Math.min(100,share)}%"></span>
+          <div class="leader-row__content">
+            <span class="leader-row__rank">${index+1}</span>
+            <span class="leader-row__name">${itemName(item)}</span>
+            <span class="leader-row__meta">
+              <b>${money(revenue)}</b>
+              <span class="leader-row__details">
+                ${quantity?`<span>${integer(quantity)} продаж</span>`:""}
+                ${unitPrice?`<span>${money(unitPrice)} / шт.</span>`:""}
+                <span>${share.toFixed(1)}%</span>
+              </span>
+            </span>
+          </div>
         </div>`;
       }).join("")
       :'<div class="empty">Нет данных о составе продаж за период</div>'

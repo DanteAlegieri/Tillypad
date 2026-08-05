@@ -1,8 +1,7 @@
-Restaurant OS 9.2.0 Today Screen Polish
-Gateway 9.2.0
+Restaurant OS 9.4.0 Settings Foundation
+Gateway 9.4.0
 Agent 31.1.0
-Agent status states
-Menu name cleanup
-Cumulative sales chart
-Last sale card
-Single finance source card
+Persistent restaurant settings in Gateway SQLite
+Settings page added
+Daily revenue plan is configurable per restaurant
+Dashboard plan, forecast and decisions use saved setting

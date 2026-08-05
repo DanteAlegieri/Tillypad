@@ -258,3 +258,115 @@ select,.pill{border:1px solid var(--line);background:#fff;border-radius:10px;pad
 @media(max-width:740px){
   .finance-source-card{align-items:flex-start;flex-direction:column}
 }
+
+
+/* Restaurant OS 9.3.0 */
+.score-main-reason{
+  margin-top:9px;
+  padding:8px 10px;
+  border-radius:10px;
+  background:#f7f8fa;
+  color:#555d68;
+  font-size:11px;
+  font-weight:750;
+  line-height:1.35;
+}
+.plan-panel{
+  padding:18px 20px;
+  margin-bottom:13px;
+}
+.plan-panel__head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:20px;
+}
+.plan-panel__head small{
+  display:block;
+  color:var(--muted);
+  margin-bottom:5px;
+}
+.plan-panel__head strong{
+  font-size:22px;
+}
+.plan-panel__result{
+  text-align:right;
+}
+.plan-panel__result b{
+  display:block;
+  font-size:25px;
+}
+.plan-panel__result span{
+  color:var(--muted);
+  font-size:12px;
+  font-weight:750;
+}
+.plan-progress{
+  height:10px;
+  margin:14px 0 9px;
+  border-radius:999px;
+  background:#eceff2;
+  overflow:hidden;
+}
+.plan-progress span{
+  display:block;
+  width:0;
+  height:100%;
+  border-radius:inherit;
+  background:var(--red);
+  transition:width .35s ease;
+}
+.plan-progress span.warning{background:var(--amber)}
+.plan-progress span.good{background:var(--green)}
+.plan-panel__footer{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:750;
+}
+.leader-row{
+  position:relative;
+  overflow:hidden;
+}
+.leader-row__content{
+  display:flex;
+  align-items:center;
+  width:100%;
+  gap:12px;
+  position:relative;
+  z-index:1;
+}
+.leader-row__share{
+  position:absolute;
+  left:0;
+  bottom:0;
+  height:3px;
+  background:var(--blue);
+  opacity:.45;
+  border-radius:99px;
+}
+.leader-row__details{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  color:var(--muted);
+  font-size:11px;
+  margin-top:3px;
+}
+.score-factor.is-main{
+  background:#fff8ee;
+  margin:0 -10px;
+  padding:11px 10px;
+  border-radius:10px;
+  border-bottom:0;
+}
+@media(max-width:740px){
+  .plan-panel__head,
+  .plan-panel__footer{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .plan-panel__result{text-align:left}
+}

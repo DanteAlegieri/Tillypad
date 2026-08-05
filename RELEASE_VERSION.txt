@@ -1,5 +1,4 @@
-Restaurant OS 10.1.2 Navigation and Agent Status Polish
-Gateway 10.1.2
+Restaurant OS 10.3.0 Release Manager v1.0
+Gateway 10.3.0
 Agent 31.1.0
-Sidebar label Главная
-Fresh signal is authoritative online status
+Automated release branch, checks, ZIP, deploy and publish

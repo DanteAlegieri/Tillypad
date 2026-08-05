@@ -605,23 +605,42 @@ function renderDecisions(decisions){
 
 function renderScoreBreakdown(factors){
   const reason=mainScoreReason(factors);
+  const maxAbsolute=Math.max(
+    1,
+    ...factors.map(item=>Math.abs(Number(item.points)||0))
+  );
 
   setHtml("score-breakdown",
-    factors.map(item=>`
-      <div class="score-factor ${
-        reason&&item.title===reason.title&&item.points===reason.points
-          ?"is-main"
-          :""
-      }">
-        <div>
-          <b>${item.title}</b>
-          <small>${item.description}</small>
-        </div>
-        <b class="${item.points>=0?"positive":"negative"}">
-          ${item.points>=0?"+":""}${item.points}
-        </b>
-      </div>
-    `).join("")
+    factors.map(item=>{
+      const isMain=Boolean(
+        reason
+        &&item.title===reason.title
+        &&item.points===reason.points
+      );
+      const width=Math.max(
+        8,
+        Math.round(Math.abs(item.points)/maxAbsolute*100)
+      );
+
+      return `
+        <article class="ros-factor-card ${isMain?"is-main":""}">
+          <div class="ros-factor-card__top">
+            <div>
+              <strong>${item.title}</strong>
+              <p>${item.description}</p>
+            </div>
+            <span class="ros-factor-card__points ${
+              item.points>=0?"positive":"negative"
+            }">
+              ${item.points>=0?"+":""}${item.points}
+            </span>
+          </div>
+          <div class="ros-factor-card__bar">
+            <span style="width:${width}%"></span>
+          </div>
+        </article>
+      `;
+    }).join("")
   );
 }
 
@@ -646,21 +665,42 @@ async function initialize(){
     };
   });
 
-  const scoreModal=byId("score-modal");
+  const scoreDrawer=byId("score-drawer");
   const scoreOpen=byId("score-details-button");
-  const scoreClose=byId("score-modal-close");
+  const scoreClose=byId("score-drawer-close");
 
-  if(scoreOpen&&scoreModal){
-    scoreOpen.onclick=()=>{scoreModal.hidden=false};
-  }
-  if(scoreClose&&scoreModal){
-    scoreClose.onclick=()=>{scoreModal.hidden=true};
-  }
-  if(scoreModal){
-    scoreModal.onclick=event=>{
-      if(event.target===scoreModal) scoreModal.hidden=true;
+  const openScoreDrawer=()=>{
+    if(!scoreDrawer) return;
+    scoreDrawer.hidden=false;
+    requestAnimationFrame(()=>{
+      scoreDrawer.classList.add("is-open");
+      document.body.classList.add("drawer-open");
+    });
+  };
+
+  const closeScoreDrawer=()=>{
+    if(!scoreDrawer||scoreDrawer.hidden) return;
+    scoreDrawer.classList.remove("is-open");
+    document.body.classList.remove("drawer-open");
+    window.setTimeout(()=>{
+      if(!scoreDrawer.classList.contains("is-open")){
+        scoreDrawer.hidden=true;
+      }
+    },220);
+  };
+
+  if(scoreOpen) scoreOpen.onclick=openScoreDrawer;
+  if(scoreClose) scoreClose.onclick=closeScoreDrawer;
+
+  if(scoreDrawer){
+    scoreDrawer.onclick=event=>{
+      if(event.target===scoreDrawer) closeScoreDrawer();
     };
   }
+
+  document.addEventListener("keydown",event=>{
+    if(event.key==="Escape") closeScoreDrawer();
+  });
 
   activatePeriodButton();
   setPeriodInUrl();
@@ -774,6 +814,24 @@ async function loadDashboard(){
   const primaryScoreReason=mainScoreReason(scoreResult.factors);
   setText(
     "score-main-reason",
+    primaryScoreReason
+      ?`${primaryScoreReason.points<0?"▼":"▲"} ${primaryScoreReason.title}: ${primaryScoreReason.description}`
+      :"Критических факторов нет"
+  );
+
+  setText("score-drawer-value",score??"—");
+  setText(
+    "score-drawer-status",
+    score===null||score===undefined
+      ?"Нет данных"
+      :score>=80
+        ?"Стабильно"
+        :score>=60
+          ?"Требует внимания"
+          :"Высокий риск"
+  );
+  setText(
+    "score-drawer-reason",
     primaryScoreReason
       ?`${primaryScoreReason.points<0?"▼":"▲"} ${primaryScoreReason.title}: ${primaryScoreReason.description}`
       :"Критических факторов нет"

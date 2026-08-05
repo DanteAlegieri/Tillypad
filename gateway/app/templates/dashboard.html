@@ -6,8 +6,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ product_name }}</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<link rel="stylesheet" href="/static/css/foundation.css?v=10.1.2">
-<link rel="stylesheet" href="/static/css/dashboard.css?v=10.1.2">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.3.0">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.3.0">
 </head>
 {% from 'components/sidebar.html' import restaurant_sidebar %}
 {% from 'components/header.html' import restaurant_header %}
@@ -148,15 +148,28 @@
 </main>
 </div>
 
-<script type="module" src="/static/js/dashboard/init.js?v=10.1.2"></script>
-<div class="modal-backdrop" id="score-modal" hidden>
- <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="score-modal-title">
-  <div class="modal-header">
-   <h3 id="score-modal-title">Из чего складывается индекс</h3>
-   <button type="button" id="score-modal-close" class="modal-close">×</button>
+<script type="module" src="/static/js/dashboard/init.js?v=10.3.0"></script>
+<div class="ros-drawer-backdrop" id="score-drawer" hidden>
+ <aside class="ros-drawer" role="dialog" aria-modal="true" aria-labelledby="score-drawer-title">
+  <div class="ros-drawer__header">
+   <div>
+    <span class="eyebrow">Индекс ресторана</span>
+    <h2 id="score-drawer-title">Почему такая оценка</h2>
+   </div>
+   <button type="button" class="ros-drawer__close" id="score-drawer-close" aria-label="Закрыть">×</button>
   </div>
-  <div id="score-breakdown" class="score-breakdown"></div>
- </div>
+
+  <div class="ros-drawer__score">
+   <div>
+    <b id="score-drawer-value">—</b>
+    <span id="score-drawer-status">Нет данных</span>
+   </div>
+   <div id="score-drawer-reason" class="score-main-reason">Ожидаю показатели</div>
+  </div>
+
+  <div id="score-breakdown" class="ros-factor-list"></div>
+ </aside>
+</div>
 </div>
 
 </body>

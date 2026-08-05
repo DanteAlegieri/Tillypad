@@ -7,4 +7,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
     -VpsHost $VpsIp `
     -VpsUser "root" `
     -RemotePath "/opt/restaurantos/gateway" `
-    -ExpectedVersion "10.1.2"
+    -ExpectedVersion "10.3.0"

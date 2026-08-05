@@ -1,30 +1,20 @@
 # Restaurant OS Design System
 
-## Layers
+## Components
 
-- `tokens.css` — цвета, интервалы, радиусы, тени.
-- `base.css` — базовые правила.
-- `layout.css` — layout primitives.
-- `components.css` — переиспользуемые компоненты.
-- `utilities.css` — короткие вспомогательные классы.
+- Card
+- KPI Card
+- Panel
+- Progress Card
+- Button
+- Badge
+- Empty State
+- Drawer
 
-## Components Foundation-02
+## Drawer
 
-- `.ros-card`
-- `.ros-kpi-card`
-- `.ros-kpi-card__label`
-- `.ros-kpi-card__value`
-- `.ros-kpi-card__meta`
-- `.ros-panel`
-- `.ros-panel__head`
-- `.ros-progress-card`
-- `.ros-button`
-- `.ros-badge`
-- `.ros-empty`
+`ros-drawer-backdrop` содержит `ros-drawer`.
+Открытие выполняется классом `is-open`, прокрутка страницы блокируется
+классом `drawer-open` на `body`.
 
-## Shared Jinja components
-
-- `components/sidebar.html`
-- `components/header.html`
-
-Существующие JS ID сохраняются, чтобы UI-рефакторинг не менял бизнес-логику.
+Первое применение — расшифровка индекса ресторана.

@@ -110,8 +110,12 @@ function resolveAgentState(lastSignal,reportedOnline){
 
   const minutes=Math.max(0,(Date.now()-signal.getTime())/60000);
 
-  if(reportedOnline&&minutes<=5){
-    return {code:"online",title:"Онлайн",detail:`Последний сигнал ${Math.max(1,Math.round(minutes))} мин. назад`};
+  if(minutes<=5){
+    return {
+      code:"online",
+      title:"Онлайн",
+      detail:`Последний сигнал ${Math.max(1,Math.round(minutes))} мин. назад`,
+    };
   }
   if(minutes<=20){
     return {code:"delayed",title:"Нет новых данных",detail:`Последний сигнал ${Math.round(minutes)} мин. назад`};

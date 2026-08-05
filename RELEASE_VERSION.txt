@@ -1,6 +1,5 @@
-Restaurant OS 10.1.1 Foundation-02 Hotfix
-Gateway 10.1.1
+Restaurant OS 10.1.2 Navigation and Agent Status Polish
+Gateway 10.1.2
 Agent 31.1.0
-Restored period controls
-Dashboard renamed to Рабочий стол директора
-Shared Header action slot
+Sidebar label Главная
+Fresh signal is authoritative online status

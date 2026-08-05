@@ -53,3 +53,76 @@ select,.pill{border:1px solid var(--line);background:#fff;border-radius:10px;pad
 .note{margin-top:10px;color:#8b9199;font-size:11px;text-align:right}
 @media(max-width:1050px){.layout{grid-template-columns:74px 1fr}.brand strong,.brand small,.nav-title,.nav span,.version{display:none}.brand{justify-content:center}.nav a{justify-content:center}.kpis{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:740px){.layout{display:block}.sidebar{position:static;height:auto;padding:8px;overflow:auto}.brand,.nav-title,.version{display:none}.nav{display:flex}.nav a{white-space:nowrap}.nav span{display:inline}main{padding:13px}.filters{display:none}.hero{grid-template-columns:1fr}.score{border-left:0;border-top:1px solid var(--line);padding:15px 0 0}.kpis,.grid-main{grid-template-columns:1fr}}
+
+
+/* Restaurant OS 8.2.0 */
+.issue{
+  display:grid;
+  grid-template-columns:7px minmax(0,1fr) auto;
+  gap:12px;
+  align-items:start;
+  min-width:0;
+}
+.issue__body{min-width:0}
+.issue__body b{
+  display:block;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+.issue__body p{
+  line-height:1.45;
+  overflow-wrap:anywhere;
+}
+.issue__tag{
+  align-self:start;
+  white-space:nowrap;
+  border-radius:999px;
+  padding:5px 8px;
+  background:#f2f4f7;
+  color:#59616d;
+  font-size:10px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.issue.critical .issue__tag{background:#fff0ef;color:var(--red)}
+.issue.warning .issue__tag{background:#fff6e8;color:#a8640d}
+.issue.ok .issue__tag{background:#eaf7ef;color:var(--green)}
+.score b{font-variant-numeric:tabular-nums}
+.score.good-score b{color:var(--green)}
+.score.warn-score b{color:var(--amber)}
+.score.bad-score b{color:var(--red)}
+.leader-row{
+  align-items:center;
+}
+.leader-row__rank{
+  width:30px;
+  height:30px;
+  flex:0 0 30px;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  background:#f2f4f7;
+  font-weight:900;
+}
+.leader-row__name{
+  min-width:0;
+  flex:1;
+  overflow-wrap:anywhere;
+}
+.leader-row__meta{
+  text-align:right;
+  white-space:nowrap;
+}
+.chart-empty{
+  height:100%;
+  display:grid;
+  place-items:center;
+  color:var(--muted);
+  font-size:13px;
+}
+@media(max-width:740px){
+  .issue{grid-template-columns:7px minmax(0,1fr)}
+  .issue__tag{grid-column:2;justify-self:start}
+}

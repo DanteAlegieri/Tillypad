@@ -199,11 +199,123 @@ function setDelta(id,value){
   element.className=`delta ${value.cls}`;
 }
 
-function topItems(menu){
-  if(Array.isArray(menu?.top_items))return menu.top_items;
-  if(Array.isArray(menu?.items))return menu.items;
-  if(Array.isArray(menu?.rows))return menu.rows;
+function rowsToObjects(dataset){
+  if(!dataset) return [];
+  if(Array.isArray(dataset)){
+    if(!dataset.length) return [];
+    if(typeof dataset[0]==="object"&&!Array.isArray(dataset[0])) return dataset;
+  }
+
+  const rows=dataset?.rows;
+  const columns=dataset?.columns;
+  if(Array.isArray(rows)&&Array.isArray(columns)){
+    return rows.map(row=>Object.fromEntries(
+      columns.map((column,index)=>[column,row[index]])
+    ));
+  }
+
   return [];
+}
+
+function topItems(menu){
+  const candidates=[
+    menu?.top_items,
+    menu?.items,
+    menu?.rows,
+    menu?.top,
+    menu?.leaders,
+    menu?.menu?.top_items,
+    menu?.data?.top_items,
+    menu?.snapshot?.top_items,
+  ];
+
+  for(const candidate of candidates){
+    const rows=rowsToObjects(candidate);
+    if(rows.length) return rows;
+  }
+
+  if(Array.isArray(menu)){
+    const rows=rowsToObjects(menu);
+    if(rows.length) return rows;
+  }
+
+  return [];
+}
+
+function itemName(item){
+  return item?.item_name
+    ??item?.name
+    ??item?.menu_item_name
+    ??item?.product_name
+    ??item?.title
+    ??"Без названия";
+}
+
+function itemRevenue(item){
+  return Number(
+    item?.revenue
+    ??item?.sum
+    ??item?.amount
+    ??item?.sales_sum
+    ??item?.total
+    ??0
+  );
+}
+
+function itemQuantity(item){
+  return Number(
+    item?.quantity
+    ??item?.qty
+    ??item?.count
+    ??item?.sales_count
+    ??item?.volume
+    ??0
+  );
+}
+
+function calculateRestaurantScore({
+  hasData,
+  online,
+  revenueDelta,
+  averageDelta,
+  checksDelta,
+  classC,
+}){
+  if(!hasData) return null;
+
+  let score=65;
+
+  if(online) score+=15;
+  else score-=15;
+
+  if(revenueDelta.raw!==null){
+    if(revenueDelta.raw>=10) score+=12;
+    else if(revenueDelta.raw>=0) score+=7;
+    else if(revenueDelta.raw>=-10) score-=5;
+    else if(revenueDelta.raw>=-25) score-=12;
+    else score-=22;
+  }
+
+  if(averageDelta.raw!==null){
+    if(averageDelta.raw>=5) score+=8;
+    else if(averageDelta.raw>=0) score+=4;
+    else if(averageDelta.raw>=-10) score-=5;
+    else score-=12;
+  }
+
+  if(checksDelta.raw!==null){
+    if(checksDelta.raw>=5) score+=6;
+    else if(checksDelta.raw< -15) score-=8;
+  }
+
+  const weakItems=Number(classC);
+  if(Number.isFinite(weakItems)){
+    if(weakItems===0) score+=4;
+    else if(weakItems<=5) score+=1;
+    else if(weakItems>=15) score-=6;
+  }
+
+  return Math.max(0,Math.min(100,Math.round(score)));
 }
 
 function setPeriodInUrl(){
@@ -285,19 +397,38 @@ async function loadDashboard(){
   setDelta("checks-delta",checksDelta);
 
   const hasCurrentData=current.checks>0||current.revenue>0;
-  const score=report?.health_score?.score??report?.score??0;
-  setText("score",hasCurrentData&&score?score:"—");
+  const online=Boolean(status?.online||status?.connected||status?.status==="online");
+  const classC=menu?.abc?.C?.count??menu?.class_c_count??null;
+  const calculatedScore=calculateRestaurantScore({
+    hasData:hasCurrentData,
+    online,
+    revenueDelta,
+    averageDelta,
+    checksDelta,
+    classC,
+  });
+  const backendScore=report?.health_score?.score??report?.score;
+  const score=Number.isFinite(Number(backendScore))
+    ?Math.round(Number(backendScore))
+    :calculatedScore;
+
+  setText("score",score===null?"—":score);
 
   const scoreNode=byId("score-status");
-  if(scoreNode&&!hasCurrentData){
+  const scoreBox=document.querySelector(".score");
+  if(scoreBox) scoreBox.classList.remove("good-score","warn-score","bad-score");
+
+  if(scoreNode&&score===null){
     scoreNode.textContent="Нет данных за период";
-    scoreNode.className="text-muted";
+    scoreNode.className="muted";
   }else if(scoreNode){
-    scoreNode.textContent=score>=80?"Хорошее состояние":score>=60?"Требует внимания":"Высокий риск";
-    scoreNode.className=score>=80?"text-good":score>=60?"text-warn":"text-bad";
+    scoreNode.textContent=score>=80?"Состояние хорошее":score>=60?"Требует внимания":"Высокий риск";
+    scoreNode.className=score>=80?"good":score>=60?"warn":"bad";
+    if(scoreBox){
+      scoreBox.classList.add(score>=80?"good-score":score>=60?"warn-score":"bad-score");
+    }
   }
 
-  const online=Boolean(status?.online||status?.connected||status?.status==="online");
   setHtml(
     "agent-state",
     `<i class="status-dot" style="background:${online?"var(--color-green)":"var(--color-red)"}"></i>${online?"Агент подключён":"Агент не в сети"}`
@@ -317,7 +448,7 @@ async function loadDashboard(){
   );
 
   const leaders=topItems(menu);
-  const leader=leaders[0]?.item_name||leaders[0]?.name||"Не определён";
+  const leader=leaders.length?itemName(leaders[0]):"Не определён";
 
   setText("leader",leader);
   setText("peak-hour",latest?.peak_hour||"Нет данных");
@@ -365,34 +496,47 @@ function renderAttention(events,revenueDelta,averageDelta,online,menu,hasData){
   const items=[];
 
   if(!online){
-    items.push({title:"Агент не в сети",text:"Свежие показатели могут не поступать."});
+    items.push({
+      severity:"critical",
+      title:"Агент не в сети",
+      text:"Свежие показатели могут не поступать.",
+      tag:"Связь",
+    });
   }
 
   if(!hasData){
     items.push({
+      severity:"warning",
       title:"Нет данных за выбранный период",
-      text:"Запустите агент 31.1.0 для загрузки истории из Tillypad.",
+      text:"Проверьте загрузку истории Windows Agent.",
+      tag:"Данные",
     });
   }else{
     if(revenueDelta.raw!==null&&revenueDelta.raw<-5){
       items.push({
+        severity:"critical",
         title:"Выручка ниже прошлого периода",
         text:`Отставание ${Math.abs(revenueDelta.raw).toFixed(1)}%.`,
+        tag:"Продажи",
       });
     }
 
     if(averageDelta.raw!==null&&averageDelta.raw<-5){
       items.push({
+        severity:"warning",
         title:"Средний чек снизился",
-        text:"Нужны допродажи и комбо.",
+        text:"Проверьте допродажи напитков, гарниров и комбо.",
+        tag:"Допродажи",
       });
     }
 
     const classC=menu?.abc?.C?.count??menu?.class_c_count;
     if(Number(classC)>0){
       items.push({
+        severity:"warning",
         title:`${classC} позиций класса C`,
-        text:"Низкий вклад в выручку — требуется анализ меню.",
+        text:"Слабые позиции требуют пересмотра или объединения в комбо.",
+        tag:"Меню",
       });
     }
   }
@@ -400,18 +544,32 @@ function renderAttention(events,revenueDelta,averageDelta,online,menu,hasData){
   (events||[])
     .filter(x=>x.event_type!=="snapshot_created")
     .slice(0,2)
-    .forEach(x=>items.push({title:x.title,text:x.description}));
+    .forEach(x=>items.push({
+      severity:x.severity==="critical"?"critical":x.severity==="success"?"ok":"warning",
+      title:x.title||"Событие ресторана",
+      text:x.description||"",
+      tag:x.source||"Система",
+    }));
 
   if(!items.length){
     items.push({
+      severity:"ok",
       title:"Критических проблем нет",
       text:"Основные показатели находятся в нормальном диапазоне.",
+      tag:"Норма",
     });
   }
 
   setHtml("attention",
     items.slice(0,5).map(x=>
-      `<article class="issue"><b>${x.title}</b><p>${x.text}</p></article>`
+      `<article class="issue ${x.severity}">
+        <div class="rail"></div>
+        <div class="issue__body">
+          <b>${x.title}</b>
+          <p>${x.text}</p>
+        </div>
+        <span class="issue__tag">${x.tag}</span>
+      </article>`
     ).join(""));
 }
 
@@ -461,16 +619,31 @@ function renderRecommendations(revenueDelta,averageDelta,menu,hasData){
 }
 
 function renderLeaders(items){
+  const sorted=[...items]
+    .sort((a,b)=>itemRevenue(b)-itemRevenue(a))
+    .slice(0,5);
+
   setHtml("leaders",
-    items.slice(0,5).map((x,i)=>
-      `<div><span>${i+1}. ${x.item_name||x.name||"Без названия"}</span><strong>${money(x.revenue||0)}</strong></div>`
-    ).join("")||'<div class="empty">Нет данных</div>');
+    sorted.length
+      ?sorted.map((item,index)=>{
+        const quantity=itemQuantity(item);
+        return `<div class="leader-row">
+          <span class="leader-row__rank">${index+1}</span>
+          <span class="leader-row__name">${itemName(item)}</span>
+          <span class="leader-row__meta">
+            <b>${money(itemRevenue(item))}</b>
+            ${quantity?`<small>${integer(quantity)} шт.</small>`:""}
+          </span>
+        </div>`;
+      }).join("")
+      :'<div class="empty">Нет данных о составе продаж за период</div>'
+  );
 }
 
 function renderChart(historyRows,latest){
-  const rows=historyRows?.rows||historyRows||[];
-  let labels=rows.map(x=>x.business_date||x.date||"");
-  let values=rows.map(x=>Number(x.revenue||0));
+  const rows=rowsToObjects(historyRows);
+  let labels=rows.map(x=>x.business_date||x.date||x.day||"");
+  let values=rows.map(x=>Number(x.revenue||x.sum||x.amount||0));
 
   if(period==="today"&&latest?.hourly?.rows){
     const columns=latest.hourly.columns||[];
@@ -485,7 +658,21 @@ function renderChart(historyRows,latest){
   }
 
   const chartNode=byId("sales-chart");
-  if(!chartNode||typeof echarts==="undefined") return;
+  if(!chartNode) return;
+
+  if(!labels.length||!values.some(value=>value>0)){
+    chartNode.innerHTML='<div class="chart-empty">Нет данных для построения графика за выбранный период</div>';
+    return;
+  }
+
+  if(typeof echarts==="undefined"){
+    chartNode.innerHTML='<div class="chart-empty">Библиотека графиков не загрузилась</div>';
+    return;
+  }
+
+  chartNode.innerHTML="";
+  const previousChart=echarts.getInstanceByDom(chartNode);
+  if(previousChart) previousChart.dispose();
   const chart=echarts.init(chartNode);
   chart.setOption({
     grid:{left:48,right:14,top:18,bottom:34},

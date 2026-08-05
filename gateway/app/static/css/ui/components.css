@@ -102,3 +102,42 @@
     flex-wrap:wrap;
   }
 }
+
+
+/* 10.1.1 period controls */
+.period-controls{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.period-controls button{
+  border:1px solid var(--ros-color-border);
+  border-radius:var(--ros-radius-md);
+  padding:10px 14px;
+  background:var(--ros-color-surface);
+  color:var(--ros-color-text);
+  font-weight:750;
+  cursor:pointer;
+  transition:
+    background var(--ros-transition-fast),
+    color var(--ros-transition-fast),
+    border-color var(--ros-transition-fast);
+}
+.period-controls button:hover{
+  border-color:#cfd5dc;
+}
+.period-controls button.is-active{
+  border-color:var(--ros-color-sidebar);
+  background:var(--ros-color-sidebar);
+  color:#fff;
+}
+@media(max-width:1100px){
+  .ros-page-header{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .ros-page-header__actions{
+    width:100%;
+  }
+}

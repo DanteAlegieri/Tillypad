@@ -6,8 +6,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ product_name }}</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<link rel="stylesheet" href="/static/css/foundation.css?v=10.1.0">
-<link rel="stylesheet" href="/static/css/dashboard.css?v=10.1.0">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.1.1">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.1.1">
 </head>
 {% from 'components/sidebar.html' import restaurant_sidebar %}
 {% from 'components/header.html' import restaurant_header %}
@@ -16,11 +16,22 @@
 {{ restaurant_sidebar('today', app_version) }}
 
 <main>
- {{ restaurant_header(
-  "Сегодня",
+ {% set dashboard_period_controls %}
+<div class="period-controls">
+ <button type="button" data-period="today">Сегодня</button>
+ <button type="button" data-period="yesterday">Вчера</button>
+ <button type="button" data-period="week">7 дней</button>
+ <button type="button" data-period="month">Этот месяц</button>
+ <button type="button" data-period="prevmonth">Прошлый месяц</button>
+</div>
+{% endset %}
+
+{{ restaurant_header(
   "Рабочий стол директора",
+  "Ежедневная картина бизнеса",
   "agent-select",
-  true
+  true,
+  dashboard_period_controls
 ) }}
 
  <section class="card hero">
@@ -137,7 +148,7 @@
 </main>
 </div>
 
-<script type="module" src="/static/js/dashboard/init.js?v=10.1.0"></script>
+<script type="module" src="/static/js/dashboard/init.js?v=10.1.1"></script>
 <div class="modal-backdrop" id="score-modal" hidden>
  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="score-modal-title">
   <div class="modal-header">

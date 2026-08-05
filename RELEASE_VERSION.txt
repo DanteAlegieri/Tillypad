@@ -1,8 +1,6 @@
-Restaurant OS 10.1.0 Foundation-02
-Gateway 10.1.0
+Restaurant OS 10.1.1 Foundation-02 Hotfix
+Gateway 10.1.1
 Agent 31.1.0
-Shared Header component
-KPI component migration
-Panel component migration
-Progress component migration
-No business-logic changes
+Restored period controls
+Dashboard renamed to Рабочий стол директора
+Shared Header action slot

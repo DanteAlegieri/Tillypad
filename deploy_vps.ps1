@@ -6,7 +6,7 @@
 
     [string]$RemotePath = "/opt/restaurantos/gateway",
 
-    [string]$ExpectedVersion = "4.2.0",
+    [string]$ExpectedVersion = "8.1.2",
 
     [string]$SshKey = "",
 
@@ -161,7 +161,9 @@ docker compose up -d --build --remove-orphans
 rm -rf "`$REMOTE_STAGING" "`$REMOTE_ARCHIVE"
 "@
 
-    $RemoteScript | & ssh @CommonSshArgs $Target "bash -s"
+    $RemoteScript = $RemoteScript -replace "`r`n", "`n"
+
+$RemoteScript | & ssh @CommonSshArgs $Target "bash -s"
     if ($LASTEXITCODE -ne 0) {
         throw "Ошибка развёртывания Gateway на VPS."
     }

@@ -1,0 +1,118 @@
+
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ product_name }}</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+ <div class="brand"><div class="brand-badge">R</div><div><strong>Restaurant OS</strong><small>Director workspace</small></div></div>
+ <nav class="nav">
+  <div class="nav-title">Рабочий стол</div>
+  <a class="active" href="/dashboard"><i>⌂</i><span>Сегодня</span></a>
+  <a href="/dashboard-old"><i>◫</i><span>Старая панель</span></a>
+  <div class="nav-title">Управление</div>
+  <a href="/dashboard-old"><i>◆</i><span>Центр решений</span></a>
+  <a href="/dashboard-old"><i>◒</i><span>Меню</span></a>
+  <a href="/dashboard-old"><i>₽</i><span>Финансы</span></a>
+  <a href="/dashboard-old"><i>→</i><span>Доставка</span></a>
+ </nav>
+ <div class="version">Restaurant OS {{ app_version }}</div>
+</aside>
+
+<main>
+ <header class="topbar">
+  <div><h1>Сегодня</h1><p id="date-title">Рабочий стол директора</p></div>
+  <div class="filters">
+   <select id="agent-select"></select>
+   <button class="pill active" data-period="today">Сегодня</button>
+   <button class="pill" data-period="yesterday">Вчера</button>
+   <button class="pill" data-period="week">7 дней</button>
+   <button class="pill" data-period="month">Этот месяц</button>
+   <button class="pill" data-period="prevmonth">Прошлый месяц</button>
+  </div>
+ </header>
+
+ <section class="card hero">
+  <div>
+   <div class="eyebrow">Цифровой управляющий</div>
+   <h2 id="hero-title">Загружаю состояние ресторана</h2>
+   <p id="hero-text">Собираю показатели и формирую краткий управленческий вывод.</p>
+   <div class="hero-meta">
+    <span id="agent-state"><span class="dot"></span>Проверяю соединение</span>
+    <span id="sync-state">Синхронизация: —</span>
+   </div>
+  </div>
+  <div class="score">
+   <small>Индекс ресторана</small>
+   <b id="score">—</b>
+   <span id="score-status" class="muted">Нет данных</span>
+  </div>
+ </section>
+
+ <section class="kpis">
+  <div class="card kpi"><small id="revenue-label">Выручка сегодня</small><b id="revenue">—</b><div id="revenue-delta" class="delta muted">—</div></div>
+  <div class="card kpi"><small id="average-label">Средний чек сегодня</small><b id="average">—</b><div id="average-delta" class="delta muted">—</div></div>
+  <div class="card kpi"><small id="checks-label">Чеков сегодня</small><b id="checks">—</b><div id="checks-delta" class="delta muted">—</div></div>
+  <div class="card kpi"><small id="forecast-label">Прогноз дня</small><b id="forecast">—</b><div class="delta muted">по текущему темпу</div></div>
+ </section>
+
+ <section class="grid-main">
+  <div class="card panel">
+   <div class="panel-head"><h3>Требует внимания</h3><span>не более пяти пунктов</span></div>
+   <div id="attention" class="attention"><div class="empty">Анализирую показатели…</div></div>
+  </div>
+  <div class="card panel">
+   <div class="panel-head"><h3>Экспресс-сводка</h3><span>касса и деньги</span></div>
+   <div class="express">
+    <div class="express-item"><small>Карта</small><b>Нет данных</b></div>
+    <div class="express-item"><small>Наличные</small><b>Нет данных</b></div>
+    <div class="express-item"><small>QR / прочее</small><b>Нет данных</b></div>
+    <div class="express-item"><small>Скидки</small><b>Нет данных</b></div>
+    <div class="express-item"><small>Возвраты</small><b>Нет данных</b></div>
+    <div class="express-item"><small>Последний чек</small><b id="last-check">Нет данных</b></div>
+   </div>
+  </div>
+ </section>
+
+ <section class="grid-main">
+  <div class="card panel">
+   <div class="panel-head"><h3>Продажи по времени</h3><span id="chart-caption">сегодня</span></div>
+   <div id="sales-chart" class="chart"></div>
+  </div>
+  <div class="card panel">
+   <div class="panel-head"><h3>Ресторан сейчас</h3><span>оперативный статус</span></div>
+   <div class="now-list">
+    <div class="now-row"><span>Последний сигнал</span><b id="last-seen">—</b></div>
+    <div class="now-row"><span>Последняя синхронизация</span><b id="last-sync">—</b></div>
+    <div class="now-row"><span>Пиковый час</span><b id="peak-hour">—</b></div>
+    <div class="now-row"><span>Лидер продаж</span><b id="leader">—</b></div>
+    <div class="now-row"><span>Позиций класса C</span><b id="class-c">—</b></div>
+    <div class="now-row"><span>Состояние данных</span><b id="data-health">—</b></div>
+   </div>
+  </div>
+ </section>
+
+ <section class="grid-main">
+  <div class="card panel">
+   <div class="panel-head"><h3>ТОП продаж</h3><span>пять позиций</span></div>
+   <div id="leaders" class="leaders"><div class="empty">Нет данных</div></div>
+  </div>
+  <div class="card panel">
+   <div class="panel-head"><h3>ИИ рекомендует</h3><span>без технических событий</span></div>
+   <div id="recommendations" class="recommendations"><div class="empty">Нет рекомендаций</div></div>
+  </div>
+ </section>
+
+ <div class="note">Оплаты, скидки и возвраты появятся после подключения соответствующих запросов TillyPad.</div>
+</main>
+</div>
+
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>

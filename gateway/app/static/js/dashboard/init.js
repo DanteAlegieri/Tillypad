@@ -37,6 +37,54 @@ const isoLocal=d=>{
 const localTime=v=>v?new Date(v).toLocaleString("ru-RU",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"—";
 const api=async u=>{const r=await fetch(u);if(!r.ok)throw new Error(await r.text());return r.json()};
 
+function cleanText(value){
+  return String(value??"")
+    .replace(/\uFFFD+/g,"")
+    .replace(/^[\s\u0000-\u001f]+/g,"")
+    .replace(/\s{2,}/g," ")
+    .trim();
+}
+
+function safeDate(value){
+  if(!value) return null;
+  const result=new Date(value);
+  return Number.isNaN(result.getTime())?null:result;
+}
+
+function resolveAgentState(lastSignal,reportedOnline){
+  const signal=safeDate(lastSignal);
+  if(!signal){
+    return {code:"offline",title:"Недоступен",detail:"Нет данных о последнем сигнале"};
+  }
+
+  const minutes=Math.max(0,(Date.now()-signal.getTime())/60000);
+
+  if(reportedOnline&&minutes<=5){
+    return {code:"online",title:"Онлайн",detail:`Последний сигнал ${Math.max(1,Math.round(minutes))} мин. назад`};
+  }
+  if(minutes<=20){
+    return {code:"delayed",title:"Нет новых данных",detail:`Последний сигнал ${Math.round(minutes)} мин. назад`};
+  }
+  if(minutes<=60){
+    return {code:"warning",title:"Требуется проверка",detail:`Нет связи ${Math.round(minutes)} мин.`};
+  }
+  return {
+    code:"offline",
+    title:"Недоступен",
+    detail:`Нет связи ${Math.floor(minutes/60)} ч. ${Math.round(minutes%60)} мин.`,
+  };
+}
+
+function lastSaleFromItems(items,fallbackTime){
+  if(!Array.isArray(items)||!items.length) return null;
+  const item=items[0];
+  return {
+    name:itemName(item),
+    amount:itemRevenue(item),
+    time:item?.last_sale_at??item?.last_sale_time??fallbackTime??null,
+  };
+}
+
 const byId=id=>document.getElementById(id);
 const setText=(id,value)=>{
   const node=byId(id);
@@ -256,12 +304,14 @@ function topItems(menu){
 }
 
 function itemName(item){
-  return item?.item_name
+  return cleanText(
+    item?.item_name
     ??item?.name
     ??item?.menu_item_name
     ??item?.product_name
     ??item?.title
-    ??"Без названия";
+    ??"Без названия"
+  );
 }
 
 function itemRevenue(item){
@@ -407,7 +457,7 @@ function buildDecisions({
       severity:"critical",
       title:"Восстановить связь с агентом",
       text:"Без свежих данных прогноз и рекомендации могут быть неточными.",
-      meta:"Приоритет 1",
+      meta:"Срочно",
       effect:"Надёжность данных",
     });
   }
@@ -417,7 +467,7 @@ function buildDecisions({
       severity:"critical",
       title:"Увеличить поток чеков",
       text:"Количество заказов снизилось сильнее среднего чека. Основная проблема — поток гостей.",
-      meta:"Приоритет 1",
+      meta:"Срочно",
       effect:`Чеки ${checksDelta.raw.toFixed(1)}%`,
     });
   }
@@ -427,7 +477,7 @@ function buildDecisions({
       severity:"warning",
       title:"Усилить допродажи",
       text:"Добавляйте напиток или гарнир к основным позициям.",
-      meta:"Приоритет 2",
+      meta:"Требует внимания",
       effect:`Средний чек ${averageDelta.raw.toFixed(1)}%`,
     });
   }
@@ -437,7 +487,7 @@ function buildDecisions({
       severity:"warning",
       title:"Поддержать продажи в слабые часы",
       text:`Используйте лидера продаж «${leader}» в акции или комбо.`,
-      meta:"Приоритет 2",
+      meta:"Требует внимания",
       effect:`Выручка ${revenueDelta.raw.toFixed(1)}%`,
     });
   }
@@ -448,7 +498,7 @@ function buildDecisions({
       severity:"warning",
       title:"Проверить слабые позиции меню",
       text:`В классе C находится ${weakItems} позиций. Их стоит убрать, изменить или объединить в комбо.`,
-      meta:"Приоритет 3",
+      meta:"Планово",
       effect:"Оптимизация меню",
     });
   }
@@ -458,7 +508,7 @@ function buildDecisions({
       severity:"ok",
       title:"Сохранять текущий темп",
       text:"Критических отклонений нет. Контролируйте наличие лидеров продаж.",
-      meta:"Норма",
+      meta:"Всё хорошо",
       effect:"Стабильная работа",
     });
   }
@@ -580,7 +630,10 @@ async function loadDashboard(){
   setDelta("checks-delta",checksDelta);
 
   const hasCurrentData=current.checks>0||current.revenue>0;
-  const online=Boolean(status?.online||status?.connected||status?.status==="online");
+  const lastSignalValue=status?.last_seen_at||status?.last_heartbeat_at||latest?.captured_at||latest?.created_at;
+  const reportedOnline=Boolean(status?.online||status?.connected||status?.status==="online");
+  const agentStatus=resolveAgentState(lastSignalValue,reportedOnline);
+  const online=agentStatus.code==="online";
   const classC=menu?.abc?.C?.count??menu?.class_c_count??null;
   const scoreResult=calculateRestaurantScore({
     hasData:hasCurrentData,
@@ -616,7 +669,10 @@ async function loadDashboard(){
 
   setHtml(
     "agent-state",
-    `<i class="status-dot" style="background:${online?"var(--color-green)":"var(--color-red)"}"></i>${online?"Агент подключён":"Агент не в сети"}`
+    `<span class="agent-state ${agentStatus.code}">
+      <i class="agent-state__dot" style="background:currentColor"></i>
+      ${agentStatus.title}
+    </span>`
   );
 
   setText(
@@ -634,6 +690,15 @@ async function loadDashboard(){
 
   const leaders=topItems(menu);
   const leader=leaders.length?itemName(leaders[0]):"Не определён";
+  const lastSale=lastSaleFromItems(
+    leaders,
+    latest?.captured_at||latest?.created_at
+  );
+  if(lastSale){
+    setText("last-sale-name",lastSale.name);
+    setText("last-sale-time",lastSale.time?localTime(lastSale.time):"—");
+    setText("last-sale-amount",money(lastSale.amount));
+  }
   const decisions=buildDecisions({
     online,
     hasData:hasCurrentData,
@@ -657,7 +722,7 @@ async function loadDashboard(){
   );
   setText(
     "data-health",
-    online?"Данные поступают":"Требуется проверка"
+    agentStatus.code==="online"?"Данные поступают":agentStatus.detail
   );
 
   const heroTitle=byId("hero-title");
@@ -753,7 +818,7 @@ function renderAttention(events,revenueDelta,averageDelta,online,menu,hasData){
       severity:"ok",
       title:"Критических проблем нет",
       text:"Основные показатели находятся в нормальном диапазоне.",
-      tag:"Норма",
+      tag:"Всё хорошо",
     });
   }
 
@@ -789,7 +854,7 @@ function renderRecommendations(revenueDelta,averageDelta,menu,hasData){
     if(revenueDelta.raw!==null&&revenueDelta.raw<-5){
       items.push({
         title:"Восстановить темп продаж",
-        text:"Проверить акции и продвижение в слабые часы.",
+        text:"Количество чеков снижается сильнее среднего чека. Запустите акцию на лидера продаж в слабые часы и вынесите комбо в закреплённое меню.",
       });
     }
 
@@ -829,7 +894,7 @@ function renderLeaders(items){
           <span class="leader-row__name">${itemName(item)}</span>
           <span class="leader-row__meta">
             <b>${money(itemRevenue(item))}</b>
-            ${quantity?`<small>${integer(quantity)} шт.</small>`:""}
+            ${quantity?`<small>${integer(quantity)} продаж</small>`:""}
           </span>
         </div>`;
       }).join("")
@@ -838,27 +903,38 @@ function renderLeaders(items){
 }
 
 function renderChart(historyRows,latest){
-  const rows=rowsToObjects(historyRows);
-  let labels=rows.map(x=>x.business_date||x.date||x.day||"");
-  let values=rows.map(x=>Number(x.revenue||x.sum||x.amount||0));
+  let labels=[];
+  let values=[];
+  let cumulative=0;
 
   if(period==="today"&&latest?.hourly?.rows){
     const columns=latest.hourly.columns||[];
-    labels=latest.hourly.rows.map(row=>{
-      const x=Object.fromEntries(columns.map((column,index)=>[column,row[index]]));
-      return String(x.hour??x.sale_hour??"");
-    });
-    values=latest.hourly.rows.map(row=>{
-      const x=Object.fromEntries(columns.map((column,index)=>[column,row[index]]));
-      return Number(x.revenue||0);
-    });
+    const rows=latest.hourly.rows.map(row=>
+      Object.fromEntries(columns.map((column,index)=>[column,row[index]]))
+    );
+
+    rows
+      .sort((a,b)=>Number(a.hour??a.sale_hour??0)-Number(b.hour??b.sale_hour??0))
+      .forEach(item=>{
+        cumulative+=Number(item.revenue||item.sum||item.amount||0);
+        labels.push(String(item.hour??item.sale_hour??""));
+        values.push(cumulative);
+      });
+  }else{
+    rowsToObjects(historyRows)
+      .sort((a,b)=>String(a.business_date||a.date||"").localeCompare(String(b.business_date||b.date||"")))
+      .forEach(item=>{
+        cumulative+=Number(item.revenue||item.sum||item.amount||0);
+        labels.push(item.business_date||item.date||item.day||"");
+        values.push(cumulative);
+      });
   }
 
   const chartNode=byId("sales-chart");
   if(!chartNode) return;
 
   if(!labels.length||!values.some(value=>value>0)){
-    chartNode.innerHTML='<div class="chart-empty">Нет данных для построения графика за выбранный период</div>';
+    chartNode.innerHTML='<div class="chart-empty">Недостаточно данных для накопительного графика</div>';
     return;
   }
 
@@ -868,18 +944,21 @@ function renderChart(historyRows,latest){
   }
 
   chartNode.innerHTML="";
-  const previousChart=echarts.getInstanceByDom(chartNode);
-  if(previousChart) previousChart.dispose();
+  const existing=echarts.getInstanceByDom(chartNode);
+  if(existing) existing.dispose();
+
   const chart=echarts.init(chartNode);
   chart.setOption({
-    grid:{left:48,right:14,top:18,bottom:34},
-    tooltip:{trigger:"axis"},
+    grid:{left:56,right:18,top:18,bottom:34},
+    tooltip:{trigger:"axis",valueFormatter:value=>money(value)},
     xAxis:{type:"category",boundaryGap:false,data:labels},
-    yAxis:{type:"value"},
+    yAxis:{type:"value",axisLabel:{formatter:value=>integer(value)}},
     series:[{
+      name:"Накопительная выручка",
       type:"line",
       smooth:true,
-      symbol:"none",
+      symbol:"circle",
+      symbolSize:6,
       lineStyle:{width:3},
       areaStyle:{opacity:.08},
       data:values,

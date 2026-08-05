@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ product_name }}</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<link rel="stylesheet" href="/static/css/dashboard.css?v=9.1.0">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=9.2.0">
 </head>
 <body>
 <div class="layout">
@@ -70,13 +70,15 @@
   </div>
   <div class="card panel">
    <div class="panel-head"><h3>Экспресс-сводка</h3><span>касса и деньги</span></div>
-   <div class="express">
-    <div class="express-item"><small>Карта</small><b>Источник не подключён</b></div>
-    <div class="express-item"><small>Наличные</small><b>Источник не подключён</b></div>
-    <div class="express-item"><small>QR / прочее</small><b>Источник не подключён</b></div>
-    <div class="express-item"><small>Скидки</small><b>Источник не подключён</b></div>
-    <div class="express-item"><small>Возвраты</small><b>Источник не подключён</b></div>
-    <div class="express-item"><small>Последний чек</small><b id="last-check">Нет данных</b></div>
+   <div class="finance-source-card">
+    <div class="finance-source-card__content">
+     <span class="finance-source-card__icon">₽</span>
+     <div>
+      <strong>Финансовые источники пока не подключены</strong>
+      <p>После подключения будут доступны наличные, карта, QR, скидки, возвраты и последний чек.</p>
+     </div>
+    </div>
+    <span class="finance-source-card__status">Ожидает подключения</span>
    </div>
   </div>
  </section>
@@ -95,6 +97,11 @@
     <div class="now-row"><span>Лидер продаж</span><b id="leader">—</b></div>
     <div class="now-row"><span>Позиций класса C</span><b id="class-c">—</b></div>
     <div class="now-row"><span>Состояние данных</span><b id="data-health">—</b></div>
+   </div>
+   <div class="live-sale-card">
+    <span>Последняя продажа</span>
+    <strong id="last-sale-name">Нет данных</strong>
+    <div><small id="last-sale-time">—</small><b id="last-sale-amount">—</b></div>
    </div>
   </div>
  </section>
@@ -124,7 +131,7 @@
 </main>
 </div>
 
-<script type="module" src="/static/js/dashboard/init.js?v=9.1.0"></script>
+<script type="module" src="/static/js/dashboard/init.js?v=9.2.0"></script>
 <div class="modal-backdrop" id="score-modal" hidden>
  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="score-modal-title">
   <div class="modal-header">

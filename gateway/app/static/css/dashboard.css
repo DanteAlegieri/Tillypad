@@ -213,3 +213,48 @@ select,.pill{border:1px solid var(--line);background:#fff;border-radius:10px;pad
 @media(max-width:900px){
   .decision-list{grid-template-columns:1fr}
 }
+
+
+/* Restaurant OS 9.2.0 */
+.finance-source-card{
+  min-height:170px;
+  border:1px dashed var(--line);
+  border-radius:16px;
+  padding:22px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  background:linear-gradient(180deg,#fff,#fbfcfd);
+}
+.finance-source-card__content{display:flex;gap:14px;align-items:flex-start}
+.finance-source-card__icon{
+  width:44px;height:44px;border-radius:12px;
+  display:grid;place-items:center;
+  background:#f1f3f5;font-size:20px;font-weight:900;
+}
+.finance-source-card strong{display:block;font-size:16px}
+.finance-source-card p{margin:7px 0 0;color:var(--muted);line-height:1.45}
+.finance-source-card__status{
+  white-space:nowrap;border-radius:999px;padding:7px 10px;
+  background:#f3f4f6;color:var(--muted);font-size:11px;font-weight:800;
+}
+.live-sale-card{
+  margin-top:14px;padding:14px;border:1px solid var(--line);
+  border-radius:14px;background:#fafbfc;
+}
+.live-sale-card>span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.live-sale-card>strong{display:block;margin:6px 0 9px;overflow-wrap:anywhere}
+.live-sale-card>div{display:flex;justify-content:space-between;gap:14px}
+.agent-state{display:inline-flex;align-items:center;gap:8px;font-weight:800}
+.agent-state__dot{width:9px;height:9px;border-radius:50%}
+.agent-state.online{color:var(--green)}
+.agent-state.delayed{color:var(--amber)}
+.agent-state.warning{color:#b45309}
+.agent-state.offline{color:var(--red)}
+.decision-card.critical{background:#fff7f6}
+.decision-card.warning{background:#fffaf1}
+.decision-card.ok{background:#f5fbf7}
+@media(max-width:740px){
+  .finance-source-card{align-items:flex-start;flex-direction:column}
+}

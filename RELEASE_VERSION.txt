@@ -1,7 +1,8 @@
-Restaurant OS 9.1.0 Modular Frontend Hotfix
-Gateway 9.1.0
+Restaurant OS 9.2.0 Today Screen Polish
+Gateway 9.2.0
 Agent 31.1.0
-Fix activatePeriodButton is not defined
-Fix setPeriodInUrl missing definition
-Dashboard loaded as ES module
-Period controls extracted to separate module
+Agent status states
+Menu name cleanup
+Cumulative sales chart
+Last sale card
+Single finance source card

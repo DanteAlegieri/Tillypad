@@ -378,3 +378,17 @@ select,.pill{border:1px solid var(--line);background:#fff;border-radius:10px;pad
 --violet:var(--ros-color-ai);--sidebar:var(--ros-color-sidebar);
 }
 .card{border-color:var(--ros-color-border);border-radius:var(--ros-radius-lg);box-shadow:var(--ros-shadow-card)}
+
+
+/* Foundation-02 compatibility */
+.kpi.ros-kpi-card{padding:17px 18px}
+.kpi.ros-kpi-card small{margin:0 0 8px}
+.kpi.ros-kpi-card b{margin:0}
+.kpi.ros-kpi-card .delta{margin-top:9px}
+.kpi--green{--ros-kpi-accent:var(--ros-color-success)}
+.kpi--blue{--ros-kpi-accent:var(--ros-color-primary)}
+.kpi--violet{--ros-kpi-accent:var(--ros-color-ai)}
+.kpi--orange{--ros-kpi-accent:var(--ros-color-warning)}
+.topbar.ros-page-header{
+  margin-bottom:13px;
+}

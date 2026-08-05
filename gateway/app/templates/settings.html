@@ -4,26 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ product_name }} — настройки</title>
-<link rel="stylesheet" href="/static/css/foundation.css?v=10.0.0">
-<link rel="stylesheet" href="/static/css/dashboard.css?v=10.0.0">
-<link rel="stylesheet" href="/static/css/settings.css?v=10.0.0">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.1.0">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.1.0">
+<link rel="stylesheet" href="/static/css/settings.css?v=10.1.0">
 </head>
 {% from 'components/sidebar.html' import restaurant_sidebar %}
+{% from 'components/header.html' import restaurant_header %}
 <body>
 <div class="layout">
 {{ restaurant_sidebar('settings', app_version) }}
 
 <main>
- <header class="topbar settings-topbar">
-  <div>
-   <h1>Настройки</h1>
-   <p>Параметры ресторана и управленческой аналитики</p>
-  </div>
-  <select id="settings-agent-select"></select>
- </header>
+ {{ restaurant_header(
+  "Настройки",
+  "Параметры ресторана и управленческой аналитики",
+  "settings-agent-select",
+  false
+) }}
 
  <section class="settings-layout">
-  <aside class="card settings-menu">
+  <aside class="card ros-card settings-menu">
    <strong>Разделы</strong>
    <button class="is-active" type="button">Общие настройки</button>
    <button type="button" disabled>Индекс ресторана <span>позже</span></button>
@@ -31,7 +31,7 @@
    <button type="button" disabled>Агент <span>позже</span></button>
   </aside>
 
-  <section class="card settings-card">
+  <section class="card ros-card settings-card">
    <div class="settings-card__head">
     <div>
      <span class="eyebrow">Общие настройки</span>
@@ -75,6 +75,6 @@
 </main>
 </div>
 
-<script type="module" src="/static/js/settings.js?v=10.0.0"></script>
+<script type="module" src="/static/js/settings.js?v=10.1.0"></script>
 </body>
 </html>

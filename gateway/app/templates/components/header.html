@@ -1,0 +1,26 @@
+{% macro restaurant_header(
+  title,
+  subtitle,
+  agent_select_id=None,
+  show_status=False
+) -%}
+<header class="ros-page-header topbar">
+ <div class="ros-page-header__title">
+  <h1>{{ title }}</h1>
+  {% if subtitle %}
+  <p>{{ subtitle }}</p>
+  {% endif %}
+ </div>
+ <div class="ros-page-header__actions">
+  {% if show_status %}
+  <span id="agent-state" class="status-pill">
+   <i class="status-dot"></i>
+   Проверка статуса…
+  </span>
+  {% endif %}
+  {% if agent_select_id %}
+  <select id="{{ agent_select_id }}"></select>
+  {% endif %}
+ </div>
+</header>
+{%- endmacro %}

@@ -6,26 +6,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ product_name }}</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<link rel="stylesheet" href="/static/css/foundation.css?v=10.0.0">
-<link rel="stylesheet" href="/static/css/dashboard.css?v=10.0.0">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.1.0">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.1.0">
 </head>
 {% from 'components/sidebar.html' import restaurant_sidebar %}
+{% from 'components/header.html' import restaurant_header %}
 <body>
 <div class="layout">
 {{ restaurant_sidebar('today', app_version) }}
 
 <main>
- <header class="topbar">
-  <div><h1>Сегодня</h1><p id="date-title">Рабочий стол директора</p></div>
-  <div class="filters">
-   <select id="agent-select"></select>
-   <button class="pill active" data-period="today">Сегодня</button>
-   <button class="pill" data-period="yesterday">Вчера</button>
-   <button class="pill" data-period="week">7 дней</button>
-   <button class="pill" data-period="month">Этот месяц</button>
-   <button class="pill" data-period="prevmonth">Прошлый месяц</button>
-  </div>
- </header>
+ {{ restaurant_header(
+  "Сегодня",
+  "Рабочий стол директора",
+  "agent-select",
+  true
+) }}
 
  <section class="card hero">
   <div>
@@ -47,13 +43,13 @@
  </section>
 
  <section class="kpis">
-  <div class="card kpi"><small id="revenue-label">Выручка сегодня</small><b id="revenue">—</b><div id="revenue-delta" class="delta muted">—</div></div>
-  <div class="card kpi"><small id="average-label">Средний чек сегодня</small><b id="average">—</b><div id="average-delta" class="delta muted">—</div></div>
-  <div class="card kpi"><small id="checks-label">Чеков сегодня</small><b id="checks">—</b><div id="checks-delta" class="delta muted">—</div></div>
-  <div class="card kpi"><small id="forecast-label">Прогноз дня</small><b id="forecast">—</b><div class="delta muted">по текущему темпу</div></div>
+  <div class="card kpi"><small class="ros-kpi-card__label" id="revenue-label">Выручка сегодня</small><b class="ros-kpi-card__value" id="revenue">—</b><div id="revenue-delta" class="delta muted">—</div></div>
+  <div class="card kpi"><small class="ros-kpi-card__label" id="average-label">Средний чек сегодня</small><b class="ros-kpi-card__value" id="average">—</b><div id="average-delta" class="delta muted">—</div></div>
+  <div class="card kpi"><small class="ros-kpi-card__label" id="checks-label">Чеков сегодня</small><b class="ros-kpi-card__value" id="checks">—</b><div id="checks-delta" class="delta muted">—</div></div>
+  <div class="card kpi"><small class="ros-kpi-card__label" id="forecast-label">Прогноз дня</small><b class="ros-kpi-card__value" id="forecast">—</b><div class="delta muted">по текущему темпу</div></div>
  </section>
 
- <section class="card plan-panel">
+ <section class="card ros-card ros-progress-card plan-panel">
   <div class="plan-panel__head">
    <div>
     <small id="plan-period-label">План на сегодня</small>
@@ -64,8 +60,8 @@
     <span id="plan-status">Ожидаю данные</span>
    </div>
   </div>
-  <div class="plan-progress">
-   <span id="plan-progress-fill"></span>
+  <div class="plan-progress ros-progress-card__track">
+   <span class="ros-progress-card__fill" id="plan-progress-fill"></span>
   </div>
   <div class="plan-panel__footer">
    <span id="plan-gap">До плана: —</span>
@@ -74,12 +70,12 @@
  </section>
 
  <section class="grid-main">
-  <div class="card panel">
-   <div class="panel-head"><h3>Требует внимания</h3><span>не более пяти пунктов</span></div>
+  <div class="card ros-card ros-panel panel">
+   <div class="panel-head ros-panel__head"><h3>Требует внимания</h3><span>не более пяти пунктов</span></div>
    <div id="attention" class="attention"><div class="empty">Анализирую показатели…</div></div>
   </div>
-  <div class="card panel">
-   <div class="panel-head"><h3>Экспресс-сводка</h3><span>касса и деньги</span></div>
+  <div class="card ros-card ros-panel panel">
+   <div class="panel-head ros-panel__head"><h3>Экспресс-сводка</h3><span>касса и деньги</span></div>
    <div class="finance-source-card">
     <div class="finance-source-card__content">
      <span class="finance-source-card__icon">₽</span>
@@ -94,12 +90,12 @@
  </section>
 
  <section class="grid-main">
-  <div class="card panel">
-   <div class="panel-head"><h3>Продажи по времени</h3><span id="chart-caption">сегодня</span></div>
+  <div class="card ros-card ros-panel panel">
+   <div class="panel-head ros-panel__head"><h3>Продажи по времени</h3><span id="chart-caption">сегодня</span></div>
    <div id="sales-chart" class="chart"></div>
   </div>
-  <div class="card panel">
-   <div class="panel-head"><h3>Ресторан сейчас</h3><span>оперативный статус</span></div>
+  <div class="card ros-card ros-panel panel">
+   <div class="panel-head ros-panel__head"><h3>Ресторан сейчас</h3><span>оперативный статус</span></div>
    <div class="now-list">
     <div class="now-row"><span>Последний сигнал</span><b id="last-seen">—</b></div>
     <div class="now-row"><span>Последняя синхронизация</span><b id="last-sync">—</b></div>
@@ -117,7 +113,7 @@
  </section>
 
  <section class="card panel decision-center">
-  <div class="panel-head">
+  <div class="panel-head ros-panel__head">
    <h3>Что сделать сейчас</h3>
    <span>приоритетные решения</span>
   </div>
@@ -127,12 +123,12 @@
  </section>
 
  <section class="grid-main">
-  <div class="card panel">
-   <div class="panel-head"><h3>ТОП продаж</h3><span>пять позиций</span></div>
+  <div class="card ros-card ros-panel panel">
+   <div class="panel-head ros-panel__head"><h3>ТОП продаж</h3><span>пять позиций</span></div>
    <div id="leaders" class="leaders"><div class="empty">Нет данных</div></div>
   </div>
-  <div class="card panel">
-   <div class="panel-head"><h3>ИИ рекомендует</h3><span>без технических событий</span></div>
+  <div class="card ros-card ros-panel panel">
+   <div class="panel-head ros-panel__head"><h3>ИИ рекомендует</h3><span>без технических событий</span></div>
    <div id="recommendations" class="recommendations"><div class="empty">Нет рекомендаций</div></div>
   </div>
  </section>
@@ -141,7 +137,7 @@
 </main>
 </div>
 
-<script type="module" src="/static/js/dashboard/init.js?v=10.0.0"></script>
+<script type="module" src="/static/js/dashboard/init.js?v=10.1.0"></script>
 <div class="modal-backdrop" id="score-modal" hidden>
  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="score-modal-title">
   <div class="modal-header">

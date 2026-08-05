@@ -905,7 +905,7 @@ def setup_dashboard_routes(
             request=request,
             name="dashboard.html",
             context={
-                "app_version": "8.0.1",
+                "app_version": "8.1.1",
                 "product_name": "Restaurant OS",
             },
         )

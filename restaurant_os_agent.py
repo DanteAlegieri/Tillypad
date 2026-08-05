@@ -49,7 +49,7 @@ from app.service_manager import (
 
 
 APP_NAME = "Restaurant OS Agent"
-VERSION = "31.0.0"
+VERSION = "31.1.0"
 SERVICE_NAME = "RestaurantOSAgent"
 SERVICE_DISPLAY_NAME = "Restaurant OS Agent"
 

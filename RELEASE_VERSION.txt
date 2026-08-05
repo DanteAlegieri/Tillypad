@@ -1,5 +1,6 @@
-Restaurant OS 8.0.1 Foundation Hotfix
-Gateway 8.0.1
-Agent 31.0.0
-Fix: add Jinja2 to gateway runtime dependencies
-Dashboard templates/static architecture retained
+Restaurant OS 8.1.1 Smart Periods Hotfix
+Gateway 8.1.1
+Agent 31.1.0
+Fix missing KPI label DOM ids
+Add safe DOM update helpers
+Keep smart periods and 70-day history backfill

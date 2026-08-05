@@ -7,7 +7,7 @@ import logging
 import os
 import platform
 import socket
-from datetime import date, datetime, timezone
+from datetime import date, timedelta, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -216,7 +216,7 @@ class WebSocketAgentClient:
             type="agent_hello",
             agent_id=self.agent_id,
             payload={
-                "agent_version": "31.0.0",
+                "agent_version": "31.1.0",
                 "hostname": platform.node(),
                 "database_name": os.environ.get(
                     "TILLYPAD_SQL_DATABASE",
@@ -263,6 +263,16 @@ class WebSocketAgentClient:
         # Первая отправка почти сразу после подключения.
         await asyncio.sleep(3)
 
+        try:
+            await self._send_history_backfill(websocket, days=70)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            LOGGER.exception(
+                "Не удалось выполнить загрузку истории: %s",
+                exc,
+            )
+
         while True:
             try:
                 payload = await asyncio.to_thread(
@@ -302,8 +312,56 @@ class WebSocketAgentClient:
 
             await asyncio.sleep(max(30, self.cloud_sync_seconds))
 
+    async def _send_history_backfill(
+        self,
+        websocket: Any,
+        days: int = 70,
+    ) -> None:
+        today = date.today()
+        LOGGER.info(
+            "Начинаю загрузку истории за %s дней",
+            days,
+        )
+
+        for offset in range(days - 1, 0, -1):
+            business_day = today - timedelta(days=offset)
+            payload = await asyncio.to_thread(
+                self._build_cloud_snapshot_for_date,
+                business_day,
+                True,
+            )
+            message = GatewayMessage(
+                type="cloud_snapshot",
+                agent_id=self.agent_id,
+                payload=encode_payload(
+                    payload,
+                    threshold_bytes=self.compress_threshold_bytes,
+                ),
+            )
+            await websocket.send(message.model_dump_json())
+
+            if offset % 10 == 0:
+                LOGGER.info(
+                    "История: отправлен день %s",
+                    business_day.isoformat(),
+                )
+
+            await asyncio.sleep(0.08)
+
+        LOGGER.info("Загрузка истории завершена")
+
     def _build_cloud_snapshot(self) -> dict[str, Any]:
-        business_date = date.today().isoformat()
+        return self._build_cloud_snapshot_for_date(
+            date.today(),
+            False,
+        )
+
+    def _build_cloud_snapshot_for_date(
+        self,
+        business_day: date,
+        historical: bool,
+    ) -> dict[str, Any]:
+        business_date = business_day.isoformat()
         period = {
             "date_from": business_date,
             "date_to": business_date,
@@ -344,9 +402,13 @@ class WebSocketAgentClient:
 
         return {
             "schema_version": 2,
-            "agent_version": "30.0.0",
+            "agent_version": "31.1.0",
             "business_date": business_date,
-            "captured_at": utc_now(),
+            "captured_at": (
+                f"{business_date}T23:59:59+00:00"
+                if historical
+                else utc_now()
+            ),
             "revenue": revenue,
             "checks_count": checks_count,
             "average_check": round(average_check, 2),

@@ -1,4 +1,8 @@
-Restaurant OS AI 4.2
-Agent 30.0.0
-Gateway 4.2.0
-Health Score History 1.0
+Restaurant OS 8.1.2 Clean Git Release
+Gateway 8.1.2
+Agent 31.1.0
+Single source of truth release
+Smart periods retained
+Jinja2/templates/static retained
+DOM hotfix retained
+Deploy CRLF normalization retained

@@ -71,7 +71,7 @@ def health() -> dict:
     return {
         "ok": True,
         "service": "restaurant-gateway",
-        "version": "10.4.9",
+        "version": "10.5.0",
         "online_agents": len(connections.connections),
     }
 

@@ -713,7 +713,14 @@ async function loadDashboard(){
 
   setQueryText(".workspace-header h1",presentation.title);
   setText("date-title",presentation.subtitle);
-  setText("chart-caption",presentation.subtitle);
+  setText(
+    "chart-caption",
+    period==="today"
+      ?`${presentation.subtitle} · по часам`
+      :period==="yesterday"
+        ?`${presentation.subtitle} · по часам`
+        :presentation.subtitle
+  );
   setText("revenue-label",presentation.revenue);
   setText("average-label",presentation.average);
   setText("checks-label",presentation.checks);
@@ -978,8 +985,8 @@ function renderAttention(events,revenueDelta,averageDelta,online,menu,hasData){
       items.push({
         severity:"warning",
         title:"Средний чек снизился",
-        text:"Проверьте допродажи напитков, гарниров и комбо.",
-        tag:"Допродажи",
+        text:`Снижение ${Math.abs(averageDelta.raw).toFixed(1)}%. Проверьте допродажи напитков, гарниров и комбо.`,
+        tag:"Маркетинг",
       });
     }
 
@@ -993,16 +1000,6 @@ function renderAttention(events,revenueDelta,averageDelta,online,menu,hasData){
       });
     }
   }
-
-  (events||[])
-    .filter(x=>x.event_type!=="snapshot_created")
-    .slice(0,2)
-    .forEach(x=>items.push({
-      severity:x.severity==="critical"?"critical":x.severity==="success"?"ok":"warning",
-      title:x.title||"Событие ресторана",
-      text:x.description||"",
-      tag:x.source||"Система",
-    }));
 
   if(!items.length){
     items.push({
@@ -1109,26 +1106,52 @@ function renderLeaders(items){
   );
 }
 
+function hourlyRowsFromSnapshot(snapshot){
+  const hourly=snapshot?.hourly;
+  if(!hourly) return [];
+
+  if(Array.isArray(hourly)){
+    return rowsToObjects(hourly);
+  }
+
+  if(Array.isArray(hourly?.rows)&&Array.isArray(hourly?.columns)){
+    return hourly.rows.map(row=>
+      Object.fromEntries(
+        hourly.columns.map((column,index)=>[column,row[index]])
+      )
+    );
+  }
+
+  return [];
+}
+
 function renderChart(historyRows,latest){
   let labels=[];
   let values=[];
   let cumulative=0;
 
-  if(period==="today"&&latest?.hourly?.rows){
-    const columns=latest.hourly.columns||[];
-    const rows=latest.hourly.rows.map(row=>
-      Object.fromEntries(columns.map((column,index)=>[column,row[index]]))
-    );
+  const history=rowsToObjects(historyRows);
+  let hourly=[];
 
-    rows
+  if(period==="today"){
+    hourly=hourlyRowsFromSnapshot(latest);
+  }else if(period==="yesterday"&&history.length){
+    hourly=hourlyRowsFromSnapshot(history[0]);
+  }
+
+  if((period==="today"||period==="yesterday")&&hourly.length){
+    hourly
       .sort((a,b)=>Number(a.hour??a.sale_hour??0)-Number(b.hour??b.sale_hour??0))
       .forEach(item=>{
-        cumulative+=Number(item.revenue||item.sum||item.amount||0);
-        labels.push(String(item.hour??item.sale_hour??""));
+        cumulative+=Number(
+          item.revenue??item.sum??item.amount??item.sales??0
+        );
+        const hour=Number(item.hour??item.sale_hour??0);
+        labels.push(Number.isFinite(hour)?`${String(hour).padStart(2,"0")}:00`:String(item.hour??item.sale_hour??""));
         values.push(cumulative);
       });
   }else{
-    rowsToObjects(historyRows)
+    history
       .sort((a,b)=>String(a.business_date||a.date||"").localeCompare(String(b.business_date||b.date||"")))
       .forEach(item=>{
         cumulative+=Number(item.revenue||item.sum||item.amount||0);
@@ -1141,7 +1164,7 @@ function renderChart(historyRows,latest){
   if(!chartNode) return;
 
   if(!labels.length||!values.some(value=>value>0)){
-    chartNode.innerHTML='<div class="chart-empty">Недостаточно данных для накопительного графика</div>';
+    chartNode.innerHTML='<div class="chart-empty">Недостаточно данных для графика выбранного периода</div>';
     return;
   }
 

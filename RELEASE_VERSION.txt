@@ -1,4 +1,5 @@
-Restaurant OS 10.3.0 Release Manager v1.0
-Gateway 10.3.0
+Restaurant OS 10.3.1 Analytics correctness
+Gateway 10.3.1
 Agent 31.1.0
-Automated release branch, checks, ZIP, deploy and publish
+Selected-period attention uses KPI comparisons only
+Today and yesterday use hourly cumulative charts when snapshot hourly data exists

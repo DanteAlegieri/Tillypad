@@ -31,6 +31,7 @@ class QueryRegistry:
             "sales_hourly": self.sales_hourly,
             "menu_items": self.menu_items,
             "latest_sale": self.latest_sale,
+            "payment_summary": self.payment_summary,
             "delivery_summary": self.delivery_summary,
             "basket_pairs": self.basket_pairs,
             "health_check": self.health_check,
@@ -193,6 +194,47 @@ class QueryRegistry:
             """,
             [date_from, date_to],
         )
+
+    def payment_summary(
+        self,
+        parameters: dict[str, Any],
+    ) -> tuple[str, list[Any]]:
+        date_from = self._require_date(
+            parameters.get("date_from"),
+            "date_from",
+        )
+        date_to = self._require_date(
+            parameters.get("date_to"),
+            "date_to",
+        )
+
+        return (
+            """
+            SELECT
+                p.pytp_ID AS payment_type_id,
+                p.pytp_Name AS payment_type_name,
+                CAST(p.pytp_IsCash AS int) AS is_cash,
+                COUNT(DISTINCT cp.chpy_chck_ID) AS checks_count,
+                COALESCE(
+                    SUM(CAST(cp.chpy_Sum AS decimal(18,4))),
+                    0
+                ) AS amount
+            FROM dbo.tp_CheckPayments AS cp
+            INNER JOIN dbo.tp_Checks AS c
+                ON c.chck_ID = cp.chpy_chck_ID
+            LEFT JOIN dbo.tp_PayTypes AS p
+                ON p.pytp_ID = cp.chpy_pytp_ID
+            WHERE c.chck_Date >= ?
+              AND c.chck_Date < DATEADD(day, 1, ?)
+            GROUP BY
+                p.pytp_ID,
+                p.pytp_Name,
+                p.pytp_IsCash
+            ORDER BY amount DESC
+            """,
+            [date_from, date_to],
+        )
+
 
     def delivery_summary(
         self,

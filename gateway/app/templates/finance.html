@@ -5,9 +5,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Финансы — Restaurant OS</title>
-<link rel="stylesheet" href="/static/css/foundation.css?v=10.4.1">
-<link rel="stylesheet" href="/static/css/dashboard.css?v=10.4.1">
-<link rel="stylesheet" href="/static/css/finance.css?v=10.4.1">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.4.3">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.4.3">
+<link rel="stylesheet" href="/static/css/finance.css?v=10.4.3">
 </head>
 <body>
 <div class="layout">
@@ -56,6 +56,22 @@
     <span>Операционный результат</span><strong id="finance-result">—</strong>
     <small id="finance-margin">Рентабельность —</small>
    </article>
+  </section>
+
+  <section class="ros-card finance-panel finance-payments-panel">
+   <div class="finance-panel-head">
+    <div>
+     <h3>Типы оплат</h3>
+     <span>фактически проведённые оплаты TillyPad</span>
+    </div>
+    <div class="payment-reconcile" id="payment-reconcile">Проверяю сверку…</div>
+   </div>
+   <div class="payment-types" id="payment-types"></div>
+   <div class="payment-summary-line">
+    <div><span>Итого оплат</span><strong id="payment-total">—</strong></div>
+    <div><span>Выручка</span><strong id="payment-revenue">—</strong></div>
+    <div><span>Расхождение</span><strong id="payment-difference">—</strong></div>
+   </div>
   </section>
 
   <section class="finance-grid">
@@ -129,6 +145,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<script src="/static/js/finance.js?v=10.4.1"></script>
+<script src="/static/js/finance.js?v=10.4.3"></script>
 </body>
 </html>

@@ -353,12 +353,53 @@ def discover_payment_schema(
                     }
                 )
 
+        # Focused, read-only samples for confirmed TillyPad payment tables.
+        # We intentionally use SELECT * here because this diagnostic release is
+        # meant to discover the real field names before production mapping.
+        payment_samples: dict[str, Any] = {}
+
+        def fetch_sample(table_name: str, limit: int) -> dict[str, Any]:
+            cursor.execute(
+                """
+                SELECT TOP (?) *
+                FROM dbo.%s
+                """ % table_name,
+                limit,
+            )
+            columns = [item[0] for item in cursor.description]
+            sample_rows = []
+            for db_row in cursor.fetchall():
+                row_dict = {}
+                for column, value in zip(columns, db_row):
+                    if value is None or isinstance(value, (str, int, float, bool)):
+                        safe_value = value
+                    elif isinstance(value, (bytes, bytearray)):
+                        safe_value = value.hex()
+                    elif hasattr(value, "isoformat"):
+                        safe_value = value.isoformat()
+                    else:
+                        safe_value = str(value)
+                    row_dict[column] = safe_value
+                sample_rows.append(row_dict)
+            return {"columns": columns, "rows": sample_rows}
+
+        for table_name, limit in (
+            ("tp_PayTypes", 200),
+            ("tp_CheckPayments", 50),
+            ("tp_Checks", 50),
+        ):
+            try:
+                payment_samples[table_name] = fetch_sample(table_name, limit)
+            except Exception as exc:
+                payment_samples[table_name] = {"error": str(exc)}
+
     return {
         "generated_at": datetime.now().isoformat(),
         "database": database,
         "keywords": list(keywords),
         "candidate_tables": tables,
         "relationships": relationships,
+        "payment_samples": payment_samples,
     }
 
 

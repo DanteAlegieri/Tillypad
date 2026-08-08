@@ -51,7 +51,7 @@ from app.service_manager import (
 
 
 APP_NAME = "Restaurant OS Agent"
-VERSION = "31.2.0"
+VERSION = "31.4.0"
 SERVICE_NAME = "RestaurantOSAgent"
 SERVICE_DISPLAY_NAME = "Restaurant OS Agent"
 
@@ -753,13 +753,13 @@ class ConfigWindow(tk.Tk):
 
         ttk.Button(
             diag_controls,
-            text="Найти таблицы оплат",
+            text="Диагностика оплат",
             command=self.run_payment_schema_probe,
         ).pack(side="left", padx=8)
 
         ttk.Button(
             diag_controls,
-            text="Сохранить оплаты",
+            text="Сохранить оплаты JSON",
             command=self.export_payment_schema,
         ).pack(side="left")
 
@@ -1007,7 +1007,7 @@ class ConfigWindow(tk.Tk):
     def run_payment_schema_probe(self):
         self.save(show_message=False)
         self.status.set(
-            "Ищу реальные таблицы и поля оплат в TillyPad..."
+            "Читаю справочник и реальные строки оплат TillyPad..."
         )
         threading.Thread(
             target=self._payment_schema_worker,
@@ -1091,7 +1091,7 @@ class ConfigWindow(tk.Tk):
             "Поиск оплат: "
             f"{len(tables)} таблиц-кандидатов, "
             f"{len(relationships)} связей. "
-            "Сохраните JSON и пришлите его."
+            "В JSON также добавлены PayTypes, CheckPayments и Checks. Сохраните и пришлите его."
         )
 
     def export_payment_schema(self):

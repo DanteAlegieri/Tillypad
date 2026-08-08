@@ -138,6 +138,12 @@ class GatewayStorage:
                 "menu_json",
                 "TEXT NOT NULL DEFAULT '{}'",
             )
+            self._ensure_column(
+                connection,
+                "sales_snapshots",
+                "payments_json",
+                "TEXT NOT NULL DEFAULT '{}'",
+            )
 
     @staticmethod
     def _ensure_column(
@@ -414,6 +420,182 @@ class GatewayStorage:
             )
         return cursor.rowcount > 0
 
+    @staticmethod
+    def _clean_payment_name(value: Any) -> str:
+        text = str(value or "").replace("\x00", "")
+        # TillyPad may store a multilingual packed string.
+        # Prefer the first readable Russian fragment.
+        known = (
+            "Банковские карты",
+            "Безналичные",
+            "Наличные",
+            "Личный счет",
+            "Личный счёт",
+            "Питание Персонала",
+            "Собственники",
+            "Перевод на карту",
+            "Бонусы",
+            "QR код",
+        )
+        for name in known:
+            if name.lower() in text.lower():
+                return name
+        text = " ".join(text.split())
+        return text[:120] or "Неизвестный тип"
+
+    @staticmethod
+    def _payment_bucket(
+        payment_type_id: str,
+        name: str,
+        is_cash: bool,
+    ) -> tuple[str, str]:
+        pid = str(payment_type_id or "").upper()
+        lowered = name.lower()
+
+        if (
+            is_cash
+            or pid == "3C80A070-E7A6-4F91-B1F5-7B8F1643B89D"
+            or "налич" in lowered
+        ):
+            return ("cash", "Наличные")
+
+        if (
+            pid == "69E60F44-033D-CA4C-AA92-4A165CA93587"
+            or "банковские карт" in lowered
+        ):
+            return ("card", "Банковские карты")
+
+        if (
+            pid == "11E9ED3D-35F3-474D-A85D-FBE6207E749A"
+            or "qr" in lowered
+            or "сбп" in lowered
+        ):
+            return ("qr", "QR / СБП")
+
+        if (
+            pid == "BD5A3A47-1B8C-AF4A-96EC-B413032F85AF"
+            or "перевод" in lowered
+        ):
+            return ("transfer", "Перевод на карту")
+
+        if (
+            pid == "A2670451-A8A7-2E4F-AD2A-DC770FD4DE19"
+            or "бонус" in lowered
+        ):
+            return ("bonus", "Бонусы")
+
+        return ("other", "Прочие")
+
+    def payment_summary_history(
+        self,
+        agent_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> dict[str, Any]:
+        snapshots = self.sales_history(
+            agent_id,
+            date_from,
+            date_to,
+        )
+
+        buckets: dict[str, dict[str, Any]] = {
+            "cash": {"key": "cash", "name": "Наличные", "amount": 0.0, "checks_count": 0},
+            "card": {"key": "card", "name": "Банковские карты", "amount": 0.0, "checks_count": 0},
+            "qr": {"key": "qr", "name": "QR / СБП", "amount": 0.0, "checks_count": 0},
+            "transfer": {"key": "transfer", "name": "Перевод на карту", "amount": 0.0, "checks_count": 0},
+            "bonus": {"key": "bonus", "name": "Бонусы", "amount": 0.0, "checks_count": 0},
+            "other": {"key": "other", "name": "Прочие", "amount": 0.0, "checks_count": 0},
+        }
+        raw_types: dict[str, dict[str, Any]] = {}
+
+        for snapshot in snapshots:
+            payments = snapshot.get("payments") or {}
+            columns = list(payments.get("columns") or [])
+            rows = list(payments.get("rows") or [])
+
+            for row in rows:
+                values = dict(zip(columns, row))
+                payment_type_id = str(
+                    values.get("payment_type_id") or ""
+                )
+                clean_name = self._clean_payment_name(
+                    values.get("payment_type_name")
+                )
+                is_cash = bool(
+                    int(values.get("is_cash") or 0)
+                )
+                amount = float(values.get("amount") or 0)
+                checks_count = int(
+                    values.get("checks_count") or 0
+                )
+
+                bucket_key, bucket_name = self._payment_bucket(
+                    payment_type_id,
+                    clean_name,
+                    is_cash,
+                )
+                bucket = buckets[bucket_key]
+                bucket["amount"] = round(
+                    float(bucket["amount"]) + amount,
+                    2,
+                )
+                bucket["checks_count"] = int(
+                    bucket["checks_count"]
+                ) + checks_count
+
+                raw_key = payment_type_id or clean_name
+                raw = raw_types.setdefault(
+                    raw_key,
+                    {
+                        "payment_type_id": payment_type_id,
+                        "name": clean_name,
+                        "bucket": bucket_key,
+                        "amount": 0.0,
+                        "checks_count": 0,
+                    },
+                )
+                raw["amount"] = round(
+                    float(raw["amount"]) + amount,
+                    2,
+                )
+                raw["checks_count"] = int(
+                    raw["checks_count"]
+                ) + checks_count
+
+        result_buckets = [
+            item
+            for item in buckets.values()
+            if float(item["amount"]) != 0
+            or int(item["checks_count"]) != 0
+        ]
+        total = round(
+            sum(float(item["amount"]) for item in result_buckets),
+            2,
+        )
+
+        for item in result_buckets:
+            item["share"] = (
+                round(float(item["amount"]) / total * 100, 1)
+                if total
+                else 0.0
+            )
+
+        return {
+            "total": total,
+            "items": result_buckets,
+            "raw_types": sorted(
+                raw_types.values(),
+                key=lambda item: float(item["amount"]),
+                reverse=True,
+            ),
+            "days_with_payment_data": sum(
+                1
+                for snapshot in snapshots
+                if (snapshot.get("payments") or {}).get("rows")
+            ),
+            "days_in_period": len(snapshots),
+        }
+
     def finance_summary(
         self,
         agent_id: str,
@@ -455,6 +637,21 @@ class GatewayStorage:
             revenue + manual_income - expenses,
             2,
         )
+
+        payments = self.payment_summary_history(
+            agent_id,
+            date_from,
+            date_to,
+        )
+        payments_total = float(payments.get("total") or 0)
+        payments_difference = round(
+            payments_total - revenue,
+            2,
+        )
+        payments["difference_to_revenue"] = payments_difference
+        payments["matches_revenue"] = abs(
+            payments_difference
+        ) <= 1.0
 
         categories: dict[str, float] = {}
         for item in operations:
@@ -516,6 +713,7 @@ class GatewayStorage:
             "operating_margin": margin,
             "cost_of_goods": None,
             "gross_profit": None,
+            "payments": payments,
             "categories": [
                 {"category": key, "amount": value}
                 for key, value in sorted(
@@ -658,10 +856,11 @@ class GatewayStorage:
                     average_check,
                     hourly_json,
                     menu_json,
+                    payments_json,
                     payload_json,
                     received_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     agent_id,
@@ -673,6 +872,10 @@ class GatewayStorage:
                     json.dumps(hourly, ensure_ascii=False),
                     json.dumps(
                         payload.get("menu") or {},
+                        ensure_ascii=False,
+                    ),
+                    json.dumps(
+                        payload.get("payments") or {},
                         ensure_ascii=False,
                     ),
                     json.dumps(payload, ensure_ascii=False),
@@ -701,6 +904,9 @@ class GatewayStorage:
         result["hourly"] = json.loads(result.pop("hourly_json"))
         result["menu"] = json.loads(
             result.pop("menu_json") or "{}"
+        )
+        result["payments"] = json.loads(
+            result.pop("payments_json", "{}") or "{}"
         )
         result["payload"] = json.loads(result.pop("payload_json"))
         return result
@@ -739,6 +945,9 @@ class GatewayStorage:
             item["hourly"] = json.loads(item.pop("hourly_json"))
             item["menu"] = json.loads(
                 item.pop("menu_json") or "{}"
+            )
+            item["payments"] = json.loads(
+                item.pop("payments_json", "{}") or "{}"
             )
             item.pop("payload_json", None)
             result.append(item)

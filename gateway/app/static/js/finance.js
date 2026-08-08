@@ -61,6 +61,7 @@ function renderSummary(data){
  currentOperations=data.operations||[];
  renderOperations(currentOperations);
  renderCategories(data.categories||[]);
+ renderPayments(data.payments||{},data.revenue||0);
  renderInsights(data);
  renderChart(data.daily||[]);
 }
@@ -100,6 +101,58 @@ function renderCategories(items){
   return `<div class="expense-row"><div><strong>${item.category}</strong><br><small>${share.toFixed(1)}% расходов</small></div><strong>${money(item.amount)}</strong></div>`;
  }).join("");
 }
+
+function renderPayments(payments,revenue){
+ const node=byId("payment-types");
+ const items=payments.items||[];
+ const order=["cash","card","qr","transfer","bonus","other"];
+ const icons={cash:"₽",card:"▣",qr:"⌗",transfer:"↗",bonus:"★",other:"•••"};
+ const byKey=Object.fromEntries(items.map(item=>[item.key,item]));
+
+ const visible=order
+  .map(key=>byKey[key])
+  .filter(Boolean);
+
+ if(!visible.length){
+  node.innerHTML='<div class="finance-empty">Данные по типам оплат ещё не получены. После обновления Agent 31.4.0 история заполнится автоматически.</div>';
+ }else{
+  node.innerHTML=visible.map(item=>`
+   <article class="payment-card">
+    <div class="payment-card-icon">${icons[item.key]||"•"}</div>
+    <div class="payment-card-body">
+     <span>${item.name}</span>
+     <strong>${money(item.amount)}</strong>
+     <small>${Number(item.share||0).toFixed(1)}% оплат · ${Number(item.checks_count||0)} чек.</small>
+    </div>
+   </article>`).join("");
+ }
+
+ const total=Number(payments.total||0);
+ const diff=Number(payments.difference_to_revenue||0);
+ setText("payment-total",money(total));
+ setText("payment-revenue",money(revenue));
+ setText("payment-difference",(diff>0?"+":"")+money(diff));
+
+ const reconcile=byId("payment-reconcile");
+ const days=Number(payments.days_with_payment_data||0);
+ const periodDays=Number(payments.days_in_period||0);
+
+ if(!days){
+  reconcile.textContent="Нет данных оплат";
+  reconcile.className="payment-reconcile warning";
+ }else if(Math.abs(diff)<=1){
+  reconcile.textContent="✓ Оплаты сходятся с выручкой";
+  reconcile.className="payment-reconcile ok";
+ }else{
+  reconcile.textContent=`Расхождение ${diff>0?"+":""}${money(diff)}`;
+  reconcile.className="payment-reconcile warning";
+ }
+
+ if(days&&periodDays&&days<periodDays){
+  reconcile.textContent+=` · данные ${days}/${periodDays} дн.`;
+ }
+}
+
 
 function renderInsights(data){
  const items=[];

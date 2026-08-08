@@ -216,7 +216,7 @@ class WebSocketAgentClient:
             type="agent_hello",
             agent_id=self.agent_id,
             payload={
-                "agent_version": "31.2.0",
+                "agent_version": "31.4.0",
                 "hostname": platform.node(),
                 "database_name": os.environ.get(
                     "TILLYPAD_SQL_DATABASE",
@@ -394,6 +394,15 @@ class WebSocketAgentClient:
             latest_sale_args,
         )
 
+        payment_sql, payment_args = self.registry.build(
+            "payment_summary",
+            period,
+        )
+        payments = self._execute_query(
+            payment_sql,
+            payment_args,
+        )
+
         revenue = 0
         checks_count = 0
         if summary.get("rows"):
@@ -410,8 +419,8 @@ class WebSocketAgentClient:
         )
 
         return {
-            "schema_version": 2,
-            "agent_version": "31.2.0",
+            "schema_version": 3,
+            "agent_version": "31.4.0",
             "business_date": business_date,
             "captured_at": (
                 f"{business_date}T23:59:59+00:00"
@@ -432,6 +441,10 @@ class WebSocketAgentClient:
             "latest_sale": {
                 "columns": latest_sale.get("columns") or [],
                 "rows": latest_sale.get("rows") or [],
+            },
+            "payments": {
+                "columns": payments.get("columns") or [],
+                "rows": payments.get("rows") or [],
             },
         }
 

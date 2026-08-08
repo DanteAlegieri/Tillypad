@@ -1,4 +1,3 @@
-Restaurant OS 10.4.5 Gateway payment persistence fix
-Gateway 10.4.5
-Agent 31.4.1
-Explicit payment persistence + diagnostics endpoint
+Restaurant OS 10.4.6 Forced historical payment replay
+Gateway 10.4.6
+Agent 31.4.2

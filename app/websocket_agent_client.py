@@ -216,7 +216,7 @@ class WebSocketAgentClient:
             type="agent_hello",
             agent_id=self.agent_id,
             payload={
-                "agent_version": "31.4.1",
+                "agent_version": "31.4.2",
                 "hostname": platform.node(),
                 "database_name": os.environ.get(
                     "TILLYPAD_SQL_DATABASE",
@@ -337,6 +337,21 @@ class WebSocketAgentClient:
                 business_day,
                 True,
             )
+            payload["_replay_payments"] = True
+
+            payment_rows = len(
+                (
+                    payload.get("payments")
+                    or {}
+                ).get("rows")
+                or []
+            )
+            LOGGER.info(
+                "Replay оплат: дата=%s, строк=%s",
+                business_day.isoformat(),
+                payment_rows,
+            )
+
             message = GatewayMessage(
                 type="cloud_snapshot",
                 agent_id=self.agent_id,

@@ -436,10 +436,18 @@ class GatewayStorage:
                     payments_json,
                     payload_json,
                     received_at
-                FROM sales_snapshots
-                WHERE agent_id = ?
-                  AND business_date BETWEEN ? AND ?
-                ORDER BY business_date
+                FROM sales_snapshots AS s
+                WHERE s.agent_id = ?
+                  AND s.business_date BETWEEN ? AND ?
+                  AND s.id = (
+                      SELECT s2.id
+                      FROM sales_snapshots AS s2
+                      WHERE s2.agent_id = s.agent_id
+                        AND s2.business_date = s.business_date
+                      ORDER BY s2.received_at DESC, s2.id DESC
+                      LIMIT 1
+                  )
+                ORDER BY s.business_date
                 """,
                 (agent_id, date_from, date_to),
             ).fetchall()
@@ -1041,6 +1049,66 @@ class GatewayStorage:
                 ),
             )
 
+
+    def _replace_latest_snapshot_for_day(
+        self,
+        connection,
+        agent_id: str,
+        business_date: str,
+        payload: dict[str, Any],
+    ) -> bool:
+        payments = self._normalize_snapshot_payments(payload)
+        cursor = connection.execute(
+            """
+            UPDATE sales_snapshots
+            SET
+                captured_at = ?,
+                revenue = ?,
+                checks_count = ?,
+                average_check = ?,
+                hourly_json = ?,
+                menu_json = ?,
+                payments_json = ?,
+                payload_json = ?,
+                received_at = ?
+            WHERE id = (
+                SELECT id
+                FROM sales_snapshots
+                WHERE agent_id = ?
+                  AND business_date = ?
+                ORDER BY received_at DESC, id DESC
+                LIMIT 1
+            )
+            """,
+            (
+                str(payload.get("captured_at") or utc_now()),
+                float(payload.get("revenue") or 0),
+                int(payload.get("checks_count") or 0),
+                float(payload.get("average_check") or 0),
+                json.dumps(
+                    payload.get("hourly") or {},
+                    ensure_ascii=False,
+                ),
+                json.dumps(
+                    payload.get("menu") or {},
+                    ensure_ascii=False,
+                ),
+                json.dumps(
+                    payments,
+                    ensure_ascii=False,
+                ),
+                json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                ),
+                utc_now(),
+                agent_id,
+                business_date,
+            ),
+        )
+        return bool(cursor.rowcount)
+
+
     def save_sales_snapshot(
         self,
         agent_id: str,
@@ -1054,6 +1122,15 @@ class GatewayStorage:
         hourly = payload.get("hourly") or {}
 
         with self.connect() as connection:
+            if bool(payload.get("_replay_payments")):
+                if self._replace_latest_snapshot_for_day(
+                    connection,
+                    agent_id,
+                    business_date,
+                    payload,
+                ):
+                    return
+
             connection.execute(
                 """
                 INSERT OR IGNORE INTO sales_snapshots (

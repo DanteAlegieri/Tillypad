@@ -1,2 +1,7 @@
-Restaurant OS 10.3.4 Comparable periods and live restaurant state
-Gateway 10.3.4
+Restaurant OS 10.3.5 Agent selection stability
+Gateway 10.3.5
+Agent 31.1.0
+Prefer gastrodom3 when available
+Ignore empty agent identifiers
+Persist selected restaurant
+Prevent blank agent requests

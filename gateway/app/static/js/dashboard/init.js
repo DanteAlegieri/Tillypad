@@ -709,14 +709,46 @@ function renderScoreBreakdown(factors){
 }
 
 async function initialize(){
-  const agents=await api("/api/web/agents").catch(()=>[]);
-  const select=document.getElementById("agent-select");
-  select.innerHTML=(agents||[]).map(x=>`<option value="${x.agent_id}">${x.name||x.agent_id}</option>`).join("");
+  const rawAgents=await api("/api/web/agents").catch(()=>[]);
+  const agents=(Array.isArray(rawAgents)?rawAgents:[])
+    .filter(item=>String(item?.agent_id??"").trim());
 
-  agent=agents?.[0]?.agent_id||"gastrodom3";
+  const select=document.getElementById("agent-select");
+  const savedAgent=String(localStorage.getItem("restaurant-os-agent")??"").trim();
+
+  const preferredAgent=
+    agents.find(item=>item.agent_id==="gastrodom3")
+    ??agents.find(item=>item.agent_id===savedAgent)
+    ??agents[0]
+    ??{agent_id:"gastrodom3",name:"Gastrodom 3"};
+
+  // Даже если API временно вернул пустой список, рабочий стол не должен
+  // превращаться в запросы с пустым agent_id.
+  const options=agents.length?agents:[preferredAgent];
+  select.innerHTML=options.map(item=>{
+    const id=String(item.agent_id).trim();
+    const label=cleanText(item.name||id)||id;
+    return `<option value="${id}">${label}</option>`;
+  }).join("");
+
+  agent=String(preferredAgent.agent_id||"gastrodom3").trim()||"gastrodom3";
+  if(![...select.options].some(option=>option.value===agent)){
+    select.insertAdjacentHTML(
+      "afterbegin",
+      `<option value="${agent}">${cleanText(preferredAgent.name||agent)||agent}</option>`
+    );
+  }
   select.value=agent;
+  localStorage.setItem("restaurant-os-agent",agent);
+
   select.onchange=()=>{
-    agent=select.value;
+    const selected=String(select.value||"").trim();
+    if(!selected){
+      select.value=agent;
+      return;
+    }
+    agent=selected;
+    localStorage.setItem("restaurant-os-agent",agent);
     loadDashboard();
   };
 
@@ -772,6 +804,12 @@ async function initialize(){
 }
 
 async function loadDashboard(){
+  if(!String(agent||"").trim()){
+    agent="gastrodom3";
+    const select=byId("agent-select");
+    if(select) select.value=agent;
+  }
+
   const loadId=++dashboardLoadSequence;
   const requestedPeriod=period;
   setText("hero-title","Обновляю данные…");
@@ -977,7 +1015,12 @@ async function loadDashboard(){
     setText("last-sale-time",lastSale.time?localTime(lastSale.time):"—");
     setText("last-sale-amount",money(lastSale.amount));
   }else{
-    setText("last-sale-name","Нет данных от агента");
+    setText(
+      "last-sale-name",
+      latest?.payload?.latest_sale
+        ?"Сегодня продаж ещё не было"
+        :"Нет данных от агента"
+    );
     setText("last-sale-time","—");
     setText("last-sale-amount","—");
   }

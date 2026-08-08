@@ -926,7 +926,7 @@ def setup_dashboard_routes(
             request=request,
             name="finance.html",
             context={
-                "app_version": "10.4.4",
+                "app_version": "10.4.5",
                 "product_name": "Restaurant OS",
             },
         )
@@ -948,6 +948,23 @@ def setup_dashboard_routes(
         storage.recover_payments_from_payloads(agent_id)
 
         return storage.finance_summary(
+            agent_id,
+            date_from,
+            date_to,
+        )
+
+    @router.get(
+        "/api/web/{agent_id}/finance/payments/diagnostics",
+        include_in_schema=False,
+    )
+    def web_finance_payment_diagnostics(
+        agent_id: str,
+        request: Request,
+        date_from: str,
+        date_to: str,
+    ):
+        require_browser_session(request)
+        return storage.payment_persistence_diagnostics(
             agent_id,
             date_from,
             date_to,
@@ -1055,7 +1072,7 @@ def setup_dashboard_routes(
             request=request,
             name="settings.html",
             context={
-                "app_version": "10.4.4",
+                "app_version": "10.4.5",
                 "product_name": "Restaurant OS",
             },
         )
@@ -1097,7 +1114,7 @@ def setup_dashboard_routes(
             request=request,
             name="dashboard.html",
             context={
-                "app_version": "10.4.4",
+                "app_version": "10.4.5",
                 "product_name": "Restaurant OS",
             },
         )

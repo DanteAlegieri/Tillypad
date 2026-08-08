@@ -114,7 +114,7 @@ function renderPayments(payments,revenue){
   .filter(Boolean);
 
  if(!visible.length){
-  node.innerHTML='<div class="finance-empty">Данные по типам оплат ещё не получены. После обновления Agent 31.4.0 история заполнится автоматически.</div>';
+  node.innerHTML='<div class="finance-empty">Данные по типам оплат ещё не получены. Данные оплат пока не сохранены на Gateway. Проверьте диагностику сохранения.</div>';
  }else{
   node.innerHTML=visible.map(item=>`
    <article class="payment-card">
@@ -212,11 +212,40 @@ async function recoverPayments(){
 }
 
 
+async function loadPaymentDiagnostics(range){
+ try{
+  const data=await api(
+   `/api/web/${agent}/finance/payments/diagnostics?date_from=${range.from}&date_to=${range.to}`
+  );
+  const node=byId("payment-diagnostics-status");
+  const saved=Number(data.days_with_payments||0);
+  const payload=Number(data.days_with_payload_payments||0);
+  const total=Number(data.days_count||0);
+
+  if(saved>0){
+   node.textContent=`Gateway: оплаты сохранены ${saved}/${total} дн.`;
+   node.className="payment-diagnostics-status ok";
+  }else if(payload>0){
+   node.textContent=`Gateway: оплаты есть в payload ${payload}/${total} дн.`;
+   node.className="payment-diagnostics-status warning";
+  }else{
+   node.textContent=`Gateway: оплат нет в ${total} снимках`;
+   node.className="payment-diagnostics-status warning";
+  }
+ }catch(error){
+  const node=byId("payment-diagnostics-status");
+  node.textContent="Диагностика Gateway недоступна";
+  node.className="payment-diagnostics-status warning";
+ }
+}
+
+
 async function loadFinance(){
  const range=rangeFor(period);
  setText("finance-hero-title","Загружаю финансы…");
  const data=await api(`/api/web/${agent}/finance/summary?date_from=${range.from}&date_to=${range.to}`);
  renderSummary(data);
+ await loadPaymentDiagnostics(range);
 }
 
 function fillCategories(type,value=""){

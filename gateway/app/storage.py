@@ -420,6 +420,120 @@ class GatewayStorage:
             )
         return cursor.rowcount > 0
 
+    def payment_persistence_diagnostics(
+        self,
+        agent_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    business_date,
+                    revenue,
+                    checks_count,
+                    payments_json,
+                    payload_json,
+                    received_at
+                FROM sales_snapshots
+                WHERE agent_id = ?
+                  AND business_date BETWEEN ? AND ?
+                ORDER BY business_date
+                """,
+                (agent_id, date_from, date_to),
+            ).fetchall()
+
+        days: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                payments = json.loads(
+                    row["payments_json"] or "{}"
+                )
+            except Exception:
+                payments = {}
+
+            try:
+                payload = json.loads(
+                    row["payload_json"] or "{}"
+                )
+            except Exception:
+                payload = {}
+
+            payment_rows = list(
+                payments.get("rows") or []
+            )
+            payload_payment_rows = list(
+                (
+                    payload.get("payments")
+                    or {}
+                ).get("rows")
+                or []
+            )
+
+            columns = list(
+                payments.get("columns") or []
+            )
+            total = 0.0
+            if columns and payment_rows:
+                try:
+                    amount_index = columns.index("amount")
+                except ValueError:
+                    amount_index = -1
+
+                if amount_index >= 0:
+                    for payment_row in payment_rows:
+                        try:
+                            total += float(
+                                payment_row[
+                                    amount_index
+                                ]
+                                or 0
+                            )
+                        except Exception:
+                            pass
+
+            days.append(
+                {
+                    "business_date": row["business_date"],
+                    "revenue": float(
+                        row["revenue"] or 0
+                    ),
+                    "checks_count": int(
+                        row["checks_count"] or 0
+                    ),
+                    "payments_rows": len(
+                        payment_rows
+                    ),
+                    "payload_payments_rows": len(
+                        payload_payment_rows
+                    ),
+                    "payments_total": round(
+                        total,
+                        2,
+                    ),
+                    "received_at": row["received_at"],
+                }
+            )
+
+        return {
+            "agent_id": agent_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "days": days,
+            "days_count": len(days),
+            "days_with_payments": sum(
+                1
+                for item in days
+                if item["payments_rows"] > 0
+            ),
+            "days_with_payload_payments": sum(
+                1
+                for item in days
+                if item["payload_payments_rows"] > 0
+            ),
+        }
+
     def recover_payments_from_payloads(
         self,
         agent_id: str | None = None,
@@ -806,6 +920,25 @@ class GatewayStorage:
         }
 
 
+    @staticmethod
+    def _normalize_snapshot_payments(
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        payments = payload.get("payments") or {}
+        columns = list(payments.get("columns") or [])
+        rows = list(payments.get("rows") or [])
+
+        # Keep only serialisable list data and preserve original ordering.
+        return {
+            "columns": columns,
+            "rows": rows,
+            "row_count": int(
+                payments.get("row_count")
+                or len(rows)
+            ),
+        }
+
+
     def create_agent(
         self,
         agent_id: str,
@@ -951,7 +1084,9 @@ class GatewayStorage:
                         ensure_ascii=False,
                     ),
                     json.dumps(
-                        payload.get("payments") or {},
+                        self._normalize_snapshot_payments(
+                            payload
+                        ),
                         ensure_ascii=False,
                     ),
                     json.dumps(payload, ensure_ascii=False),

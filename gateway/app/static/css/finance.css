@@ -34,3 +34,14 @@
 
 .payment-head-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .payment-recover-button{font-size:11px;padding:7px 10px;min-height:auto}
+
+.payment-diagnostics-status{
+ font-size:11px;
+ font-weight:800;
+ padding:7px 10px;
+ border-radius:999px;
+ background:var(--ros-color-soft);
+ color:var(--ros-color-muted)
+}
+.payment-diagnostics-status.ok{color:var(--ros-color-success)}
+.payment-diagnostics-status.warning{color:var(--ros-color-warning)}

@@ -1,4 +1,4 @@
-Restaurant OS 10.4.4 Payment recovery
-Gateway 10.4.4
+Restaurant OS 10.4.5 Gateway payment persistence fix
+Gateway 10.4.5
 Agent 31.4.1
-Recover historical payment data from payload_json and add detailed payment logs
+Explicit payment persistence + diagnostics endpoint

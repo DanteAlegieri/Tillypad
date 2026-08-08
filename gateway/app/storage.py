@@ -1097,6 +1097,23 @@ class GatewayStorage:
                 2,
             )
 
+        # Purchases are already included in total expenses above. Add the
+        # same amounts to the per-day series so the chart reconciles with
+        # the financial summary and expense structure.
+        for item in purchases.get("daily") or []:
+            day = str(item.get("date") or "")
+            if not day:
+                continue
+            daily.setdefault(
+                day,
+                {"revenue": 0.0, "income": 0.0, "expenses": 0.0},
+            )
+            daily[day]["expenses"] = round(
+                daily[day]["expenses"]
+                + float(item.get("amount") or 0),
+                2,
+            )
+
         margin = (
             round(operating_result / revenue * 100, 1)
             if revenue > 0

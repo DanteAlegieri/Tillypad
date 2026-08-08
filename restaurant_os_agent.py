@@ -27,10 +27,12 @@ import pywintypes
 
 from app.agent_diagnostics import (
     discover_payment_schema,
+    discover_food_cost_schema,
     export_support_report,
     load_env_file,
     run_all,
     save_payment_schema_report,
+    save_food_cost_schema_report,
 )
 from app.websocket_agent_client import WebSocketAgentClient
 from app.sql_autodetect import (
@@ -51,7 +53,7 @@ from app.service_manager import (
 
 
 APP_NAME = "Restaurant OS Agent"
-VERSION = "31.5.1"
+VERSION = "31.6.3"
 SERVICE_NAME = "RestaurantOSAgent"
 SERVICE_DISPLAY_NAME = "Restaurant OS Agent"
 
@@ -763,6 +765,18 @@ class ConfigWindow(tk.Tk):
             command=self.export_payment_schema,
         ).pack(side="left")
 
+        ttk.Button(
+            diag_controls,
+            text="Диагностика себестоимости",
+            command=self.run_food_cost_schema_probe,
+        ).pack(side="left", padx=8)
+
+        ttk.Button(
+            diag_controls,
+            text="Сохранить Food Cost JSON",
+            command=self.export_food_cost_schema,
+        ).pack(side="left")
+
         ttk.Label(
             service,
             textvariable=self.service_status,
@@ -1124,6 +1138,51 @@ class ConfigWindow(tk.Tk):
                 "Пришлите этот JSON в чат."
             ),
         )
+
+    def run_food_cost_schema_probe(self):
+        self.save(show_message=False)
+        self.status.set("Исследую таблицы себестоимости и списаний TillyPad...")
+        threading.Thread(target=self._food_cost_schema_worker, daemon=True).start()
+
+    def _food_cost_schema_worker(self):
+        try:
+            report = discover_food_cost_schema(self.collect())
+            self.food_cost_schema_report = report
+            self.after(0, lambda: self.show_food_cost_schema(report))
+        except Exception as exc:
+            self.food_cost_schema_report = None
+            self.after(0, lambda: messagebox.showerror(
+                APP_NAME, "Не удалось исследовать себестоимость:\n" + str(exc)))
+            self.after(0, lambda: self.status.set("Диагностика себестоимости завершилась ошибкой"))
+
+    def show_food_cost_schema(self, report):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        tables = report.get("candidate_tables") or []
+        relationships = report.get("relationships") or []
+        if not tables:
+            self.tree.insert("", "end", values=("Инфо", "Диагностика StoreEngine завершена", "—"))
+        else:
+            for table in tables[:80]:
+                keywords=", ".join(table.get("matched_keywords") or [])
+                columns=", ".join(c.get("name","") for c in (table.get("columns") or [])[:12])
+                if len(table.get("columns") or []) > 12: columns += ", …"
+                self.tree.insert("", "end", values=("Найдено",
+                    f"{table.get('schema')}.{table.get('table')} | ключи: {keywords} | поля: {columns}", "—"))
+        self.status.set(
+            f"Себестоимость: {len(tables)} таблиц-кандидатов, {len(relationships)} связей. "
+            "Сохраните Food Cost JSON и пришлите его в чат.")
+
+    def export_food_cost_schema(self):
+        report = getattr(self, "food_cost_schema_report", None)
+        if not report:
+            messagebox.showwarning(APP_NAME, "Сначала нажмите «Диагностика себестоимости».")
+            return
+        filename=filedialog.asksaveasfilename(defaultextension=".json",
+            initialfile="tillypad_food_cost_schema.json", filetypes=[("JSON","*.json")])
+        if not filename: return
+        save_food_cost_schema_report(report, Path(filename))
+        messagebox.showinfo(APP_NAME, "Отчёт по себестоимости сохранён.\n\nПришлите этот JSON в чат.")
 
     def refresh_service(self):
         try:

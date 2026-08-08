@@ -403,6 +403,461 @@ def discover_payment_schema(
     }
 
 
+
+def discover_food_cost_schema(
+    settings: dict[str, str],
+) -> dict[str, Any]:
+    """Read-only targeted probe of TillyPad StoreEngine for actual food cost."""
+    server = settings.get("TILLYPAD_SQL_SERVER", "127.0.0.1")
+    port = settings.get("TILLYPAD_SQL_PORT", "1433")
+    database = settings.get("TILLYPAD_SQL_DATABASE", "")
+    user = settings.get("TILLYPAD_SQL_USER", "")
+    password = settings.get("TILLYPAD_SQL_PASSWORD", "")
+    driver = settings.get(
+        "TILLYPAD_SQL_DRIVER",
+        "ODBC Driver 18 for SQL Server",
+    )
+    encrypt = settings.get("TILLYPAD_SQL_ENCRYPT", "no")
+    trust = settings.get(
+        "TILLYPAD_SQL_TRUST_CERTIFICATE",
+        "yes",
+    )
+    timeout = int(
+        settings.get("TILLYPAD_SQL_TIMEOUT", "10")
+    )
+
+    connection_string = (
+        f"DRIVER={{{driver}}};"
+        f"SERVER={server},{port};"
+        f"DATABASE={database};"
+        f"UID={user};PWD={password};"
+        f"Encrypt={encrypt};"
+        f"TrustServerCertificate={trust};"
+        f"Connection Timeout={timeout};"
+    )
+
+    def safe_value(value: Any) -> Any:
+        if value is None or isinstance(
+            value,
+            (str, int, float, bool),
+        ):
+            return value
+        if isinstance(value, (bytes, bytearray)):
+            return value.hex()
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value)
+
+    with pyodbc.connect(connection_string) as connection:
+        cursor = connection.cursor()
+
+        target_tables = (
+            "tp_StoreEngine",
+            "tp_ProductItems",
+            "tp_Stores",
+            "tp_SaleDocuments",
+            "tp_SaleDocumentItems",
+            "tp_WriteOffDocuments",
+            "tp_WriteOffDocumentItems",
+        )
+
+        placeholders = ",".join("?" for _ in target_tables)
+        cursor.execute(
+            f"""
+            SELECT
+                s.name AS schema_name,
+                t.name AS table_name,
+                c.column_id,
+                c.name AS column_name,
+                ty.name AS data_type,
+                c.max_length,
+                c.precision,
+                c.scale,
+                c.is_nullable
+            FROM sys.tables AS t
+            JOIN sys.schemas AS s
+              ON s.schema_id = t.schema_id
+            JOIN sys.columns AS c
+              ON c.object_id = t.object_id
+            JOIN sys.types AS ty
+              ON ty.user_type_id = c.user_type_id
+            WHERE t.name IN ({placeholders})
+            ORDER BY s.name, t.name, c.column_id
+            """,
+            *target_tables,
+        )
+
+        structures: dict[str, dict[str, Any]] = {
+            table: {
+                "table": table,
+                "exists": False,
+                "columns": [],
+            }
+            for table in target_tables
+        }
+
+        for row in cursor.fetchall():
+            table = str(row.table_name)
+            if table not in structures:
+                continue
+            item = structures[table]
+            item["exists"] = True
+            item["schema"] = str(row.schema_name)
+            item["columns"].append(
+                {
+                    "name": str(row.column_name),
+                    "data_type": str(row.data_type),
+                    "max_length": int(row.max_length),
+                    "precision": int(row.precision),
+                    "scale": int(row.scale),
+                    "nullable": bool(row.is_nullable),
+                }
+            )
+
+        store_engine = structures["tp_StoreEngine"]
+        if not store_engine["exists"]:
+            return {
+                "generated_at": datetime.now().isoformat(),
+                "database": database,
+                "mode": "store_engine_food_cost_probe",
+                "read_only": True,
+                "error": "tp_StoreEngine not found",
+                "structures": list(structures.values()),
+            }
+
+        sten_columns = {
+            column["name"]
+            for column in store_engine["columns"]
+        }
+
+        # Determine useful columns dynamically because TillyPad builds may
+        # differ. The probe never guesses non-existing fields.
+        preferred = [
+            "sten_ID",
+            "sten_Date",
+            "sten_pitm_ID",
+            "sten_stor_ID",
+            "sten_Volume",
+            "sten_Price",
+            "sten_Sum",
+            "sten_DocumentID",
+            "sten_DocumentItemID",
+            "sten_dtyp_ID",
+            "sten_Type",
+            "sten_OperationType",
+            "sten_SourceType",
+            "sten_State",
+            "sten_Done",
+            "sten_IsDeleted",
+        ]
+        selected_sten = [
+            name for name in preferred
+            if name in sten_columns
+        ]
+
+        # Also include any other StoreEngine fields that may identify
+        # source document/type/operation.
+        for name in sorted(sten_columns):
+            lname = name.lower()
+            if name in selected_sten:
+                continue
+            if any(
+                token in lname
+                for token in (
+                    "doc",
+                    "type",
+                    "oper",
+                    "sale",
+                    "write",
+                    "output",
+                    "input",
+                    "return",
+                    "move",
+                    "compound",
+                    "decompose",
+                    "state",
+                    "done",
+                    "deleted",
+                    "parent",
+                    "source",
+                    "target",
+                )
+            ):
+                selected_sten.append(name)
+
+        product_columns = {
+            column["name"]
+            for column in structures[
+                "tp_ProductItems"
+            ]["columns"]
+        }
+        store_columns = {
+            column["name"]
+            for column in structures[
+                "tp_Stores"
+            ]["columns"]
+        }
+
+        join_product = (
+            "sten_pitm_ID" in sten_columns
+            and "pitm_ID" in product_columns
+        )
+        join_store = (
+            "sten_stor_ID" in sten_columns
+            and "stor_ID" in store_columns
+        )
+
+        select_parts = [
+            f"se.[{name}] AS [{name}]"
+            for name in selected_sten
+        ]
+
+        if join_product:
+            for name in (
+                "pitm_Name",
+                "pitm_Article",
+                "pitm_picl_ID",
+            ):
+                if name in product_columns:
+                    select_parts.append(
+                        f"p.[{name}] AS [{name}]"
+                    )
+
+        if join_store:
+            for name in (
+                "stor_Name",
+                "stor_Description",
+            ):
+                if name in store_columns:
+                    select_parts.append(
+                        f"s.[{name}] AS [{name}]"
+                    )
+
+        join_sql = ""
+        if join_product:
+            join_sql += (
+                "\nLEFT JOIN dbo.tp_ProductItems AS p "
+                "ON p.pitm_ID = se.sten_pitm_ID"
+            )
+        if join_store:
+            join_sql += (
+                "\nLEFT JOIN dbo.tp_Stores AS s "
+                "ON s.stor_ID = se.sten_stor_ID"
+            )
+
+        order_sql = ""
+        if "sten_Date" in sten_columns:
+            order_sql = " ORDER BY se.sten_Date DESC"
+        elif "sten_ID" in sten_columns:
+            order_sql = " ORDER BY se.sten_ID DESC"
+
+        rows = []
+        query_error = None
+        if select_parts:
+            query = (
+                "SELECT TOP (500)\n    "
+                + ",\n    ".join(select_parts)
+                + "\nFROM dbo.tp_StoreEngine AS se"
+                + join_sql
+                + order_sql
+            )
+            try:
+                cursor.execute(query)
+                columns = [
+                    description[0]
+                    for description in cursor.description
+                ]
+                for db_row in cursor.fetchall():
+                    rows.append(
+                        {
+                            column: safe_value(value)
+                            for column, value in zip(
+                                columns,
+                                db_row,
+                            )
+                        }
+                    )
+            except Exception as exc:
+                query_error = str(exc)
+
+        # Summary by date using the exact StoreEngine cost fields if present.
+        daily_summary = []
+        if all(
+            name in sten_columns
+            for name in (
+                "sten_Date",
+                "sten_Sum",
+            )
+        ):
+            try:
+                cursor.execute("""
+                    SELECT TOP (30)
+                        CAST(se.sten_Date AS date) AS business_date,
+                        COUNT_BIG(*) AS rows_count,
+                        SUM(CAST(se.sten_Sum AS decimal(38, 6))) AS sum_total
+                    FROM dbo.tp_StoreEngine AS se
+                    GROUP BY CAST(se.sten_Date AS date)
+                    ORDER BY business_date DESC
+                """)
+                for row in cursor.fetchall():
+                    daily_summary.append(
+                        {
+                            "business_date": safe_value(
+                                row.business_date
+                            ),
+                            "rows_count": int(
+                                row.rows_count
+                            ),
+                            "sum_total": safe_value(
+                                row.sum_total
+                            ),
+                        }
+                    )
+            except Exception as exc:
+                daily_summary = [
+                    {"error": str(exc)}
+                ]
+
+        # Enumerate distinct combinations of likely source/type fields.
+        discriminator_columns = [
+            name
+            for name in selected_sten
+            if any(
+                token in name.lower()
+                for token in (
+                    "type",
+                    "oper",
+                    "doc",
+                    "state",
+                    "done",
+                    "deleted",
+                    "source",
+                )
+            )
+        ][:6]
+
+        discriminator_samples = []
+        if discriminator_columns:
+            group_cols = ", ".join(
+                f"se.[{name}]"
+                for name in discriminator_columns
+            )
+            select_cols = ", ".join(
+                f"se.[{name}] AS [{name}]"
+                for name in discriminator_columns
+            )
+            try:
+                cursor.execute(
+                    "SELECT TOP (100) "
+                    + select_cols
+                    + ", COUNT_BIG(*) AS rows_count "
+                    "FROM dbo.tp_StoreEngine AS se "
+                    "GROUP BY "
+                    + group_cols
+                    + " ORDER BY rows_count DESC"
+                )
+                columns = [
+                    description[0]
+                    for description in cursor.description
+                ]
+                for db_row in cursor.fetchall():
+                    discriminator_samples.append(
+                        {
+                            column: safe_value(value)
+                            for column, value in zip(
+                                columns,
+                                db_row,
+                            )
+                        }
+                    )
+            except Exception as exc:
+                discriminator_samples = [
+                    {"error": str(exc)}
+                ]
+
+        # Relevant FK relationships only.
+        cursor.execute("""
+            SELECT
+                OBJECT_SCHEMA_NAME(
+                    fk.parent_object_id
+                ) AS parent_schema,
+                OBJECT_NAME(
+                    fk.parent_object_id
+                ) AS parent_table,
+                pc.name AS parent_column,
+                OBJECT_SCHEMA_NAME(
+                    fk.referenced_object_id
+                ) AS referenced_schema,
+                OBJECT_NAME(
+                    fk.referenced_object_id
+                ) AS referenced_table,
+                rc.name AS referenced_column
+            FROM sys.foreign_keys AS fk
+            JOIN sys.foreign_key_columns AS fkc
+              ON fkc.constraint_object_id = fk.object_id
+            JOIN sys.columns AS pc
+              ON pc.object_id = fkc.parent_object_id
+             AND pc.column_id = fkc.parent_column_id
+            JOIN sys.columns AS rc
+              ON rc.object_id = fkc.referenced_object_id
+             AND rc.column_id = fkc.referenced_column_id
+            WHERE
+                OBJECT_NAME(fk.parent_object_id) = 'tp_StoreEngine'
+                OR OBJECT_NAME(
+                    fk.referenced_object_id
+                ) = 'tp_StoreEngine'
+            ORDER BY
+                parent_table,
+                parent_column,
+                referenced_table,
+                referenced_column
+        """)
+        relationships = [
+            {
+                "parent_schema": str(row.parent_schema),
+                "parent_table": str(row.parent_table),
+                "parent_column": str(
+                    row.parent_column
+                ),
+                "referenced_schema": str(
+                    row.referenced_schema
+                ),
+                "referenced_table": str(
+                    row.referenced_table
+                ),
+                "referenced_column": str(
+                    row.referenced_column
+                ),
+            }
+            for row in cursor.fetchall()
+        ]
+
+    return {
+        "generated_at": datetime.now().isoformat(),
+        "database": database,
+        "mode": "store_engine_food_cost_probe",
+        "read_only": True,
+        "structures": [
+            structures[table]
+            for table in target_tables
+        ],
+        "store_engine_selected_columns": selected_sten,
+        "store_engine_rows": {
+            "limit": 500,
+            "rows": rows,
+            "error": query_error,
+        },
+        "daily_summary": daily_summary,
+        "discriminator_columns": discriminator_columns,
+        "discriminator_samples": discriminator_samples,
+        "relationships": relationships,
+    }
+
+
+def save_food_cost_schema_report(report: dict[str, Any], target: Path) -> Path:
+    target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return target
+
 def save_payment_schema_report(
     report: dict[str, Any],
     target: Path,

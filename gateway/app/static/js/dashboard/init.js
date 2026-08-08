@@ -38,6 +38,7 @@ const localTime=v=>v?new Date(v).toLocaleString("ru-RU",{day:"2-digit",month:"sh
 const api=async u=>{const r=await fetch(u);if(!r.ok)throw new Error(await r.text());return r.json()};
 
 let dailyRevenuePlan=10000;
+let dashboardLoadSequence=0;
 
 function daysInclusive(fromDate,toDate){
   const start=new Date(fromDate.getFullYear(),fromDate.getMonth(),fromDate.getDate());
@@ -46,7 +47,19 @@ function daysInclusive(fromDate,toDate){
 }
 
 function planForPeriod(periodName,range){
-  if(periodName==="today"||periodName==="yesterday") return dailyRevenuePlan;
+  if(periodName==="today"||periodName==="yesterday"){
+    return dailyRevenuePlan;
+  }
+
+  if(periodName==="month"||periodName==="prevmonth"){
+    const daysInMonth=new Date(
+      range.fromDate.getFullYear(),
+      range.fromDate.getMonth()+1,
+      0
+    ).getDate();
+    return dailyRevenuePlan*daysInMonth;
+  }
+
   return dailyRevenuePlan*daysInclusive(range.fromDate,range.toDate);
 }
 
@@ -174,39 +187,39 @@ function formatShort(dateValue){
   }).format(dateValue);
 }
 
-function ranges(){
+function ranges(periodName=period){
   const now=new Date();
   const from=new Date(now);
   const to=new Date(now);
   const pf=new Date(now);
   const pt=new Date(now);
 
-  if(period==="today"){
+  if(periodName==="today"){
     pf.setDate(pf.getDate()-1);
     pt.setDate(pt.getDate()-1);
   }
 
-  if(period==="yesterday"){
+  if(periodName==="yesterday"){
     from.setDate(from.getDate()-1);
     to.setDate(to.getDate()-1);
     pf.setDate(pf.getDate()-2);
     pt.setDate(pt.getDate()-2);
   }
 
-  if(period==="week"){
+  if(periodName==="week"){
     from.setDate(from.getDate()-6);
     pf.setDate(pf.getDate()-13);
     pt.setDate(pt.getDate()-7);
   }
 
-  if(period==="month"){
+  if(periodName==="month"){
     from.setDate(1);
 
     pf.setMonth(pf.getMonth()-1,1);
     pt.setFullYear(pf.getFullYear(),pf.getMonth()+1,0);
   }
 
-  if(period==="prevmonth"){
+  if(periodName==="prevmonth"){
     from.setMonth(from.getMonth()-1,1);
     to.setDate(0);
 
@@ -224,8 +237,8 @@ function ranges(){
   };
 }
 
-function periodPresentation(range){
-  if(period==="today"){
+function periodPresentation(range,periodName=period){
+  if(periodName==="today"){
     return {
       title:"Сегодня",
       subtitle:new Intl.DateTimeFormat("ru-RU",{
@@ -239,7 +252,7 @@ function periodPresentation(range){
     };
   }
 
-  if(period==="yesterday"){
+  if(periodName==="yesterday"){
     return {
       title:"Вчера",
       subtitle:new Intl.DateTimeFormat("ru-RU",{
@@ -253,7 +266,7 @@ function periodPresentation(range){
     };
   }
 
-  if(period==="week"){
+  if(periodName==="week"){
     return {
       title:"Последние 7 дней",
       subtitle:`${formatShort(range.fromDate)} — ${formatShort(range.toDate)}`,
@@ -267,7 +280,7 @@ function periodPresentation(range){
 
   const monthTitle=`${monthName(range.fromDate.getMonth())} ${range.fromDate.getFullYear()}`;
 
-  if(period==="month"){
+  if(periodName==="month"){
     return {
       title:monthTitle,
       subtitle:`${formatShort(range.fromDate)} — ${formatShort(range.toDate)}`,
@@ -738,16 +751,19 @@ async function initialize(){
 }
 
 async function loadDashboard(){
-  const range=ranges();
-  const presentation=periodPresentation(range);
+  const loadId=++dashboardLoadSequence;
+  const requestedPeriod=period;
+  setText("hero-title","Обновляю данные…");
+  const range=ranges(requestedPeriod);
+  const presentation=periodPresentation(range,requestedPeriod);
 
   setQueryText(".workspace-header h1",presentation.title);
   setText("date-title",presentation.subtitle);
   setText(
     "chart-caption",
-    period==="today"
+    requestedPeriod==="today"
       ?`${presentation.subtitle} · по часам`
-      :period==="yesterday"
+      :requestedPeriod==="yesterday"
         ?`${presentation.subtitle} · по часам`
         :presentation.subtitle
   );
@@ -767,6 +783,12 @@ async function loadDashboard(){
     api(`/api/web/${agent}/settings`).catch(()=>({daily_revenue_plan:10000})),
   ]);
 
+  // Если пользователь уже переключил период, этот ответ устарел.
+  // Он не имеет права перерисовывать новый экран.
+  if(loadId!==dashboardLoadSequence||requestedPeriod!==period){
+    return;
+  }
+
   dailyRevenuePlan=Number(
     restaurantSettings?.daily_revenue_plan??10000
   );
@@ -783,8 +805,8 @@ async function loadDashboard(){
   setText("revenue",money(current.revenue));
   setText("average",money(average));
   setText("checks",integer(current.checks));
-  const forecastRevenue=calculateForecast(current.revenue,period);
-  const revenuePlan=planForPeriod(period,range);
+  const forecastRevenue=calculateForecast(current.revenue,requestedPeriod);
+  const revenuePlan=planForPeriod(requestedPeriod,range);
   const planPercent=percentOf(current.revenue,revenuePlan);
   const forecastPercent=percentOf(forecastRevenue,revenuePlan);
   const planGap=Math.max(0,revenuePlan-current.revenue);
@@ -800,9 +822,9 @@ async function loadDashboard(){
   );
   setText(
     "plan-period-label",
-    period==="today"
+    requestedPeriod==="today"
       ?"План на сегодня"
-      :period==="yesterday"
+      :requestedPeriod==="yesterday"
         ?"План на вчера"
         :"План за выбранный период"
   );
@@ -812,7 +834,7 @@ async function loadDashboard(){
   );
   setText(
     "plan-forecast-status",
-    isForecastPeriod(period)
+    isForecastPeriod(requestedPeriod)
       ?(
         forecastGap>0
           ?`Прогноз ниже плана на ${money(forecastGap)}`
@@ -943,7 +965,7 @@ async function loadDashboard(){
     currentRevenue:current.revenue,
     forecastRevenue,
     revenuePlan,
-    periodName:period,
+    periodName:requestedPeriod,
   });
   renderDecisions(decisions);
 
@@ -988,7 +1010,7 @@ async function loadDashboard(){
   renderAttention(events,revenueDelta,averageDelta,online,menu,hasCurrentData);
   renderRecommendations(revenueDelta,averageDelta,menu,hasCurrentData);
   renderLeaders(leaders);
-  renderChart(historyRows,latest);
+  renderChart(historyRows,latest,requestedPeriod);
 }
 
 function renderAttention(events,revenueDelta,averageDelta,online,menu,hasData){
@@ -1164,7 +1186,7 @@ function hourlyRowsFromSnapshot(snapshot){
   return [];
 }
 
-function renderChart(historyRows,latest){
+function renderChart(historyRows,latest,periodName=period){
   let labels=[];
   let values=[];
   let cumulative=0;
@@ -1172,13 +1194,13 @@ function renderChart(historyRows,latest){
   const history=rowsToObjects(historyRows);
   let hourly=[];
 
-  if(period==="today"){
+  if(periodName==="today"){
     hourly=hourlyRowsFromSnapshot(latest);
-  }else if(period==="yesterday"&&history.length){
+  }else if(periodName==="yesterday"&&history.length){
     hourly=hourlyRowsFromSnapshot(history[0]);
   }
 
-  if((period==="today"||period==="yesterday")&&hourly.length){
+  if((periodName==="today"||periodName==="yesterday")&&hourly.length){
     hourly
       .sort((a,b)=>Number(a.hour??a.sale_hour??0)-Number(b.hour??b.sale_hour??0))
       .forEach(item=>{

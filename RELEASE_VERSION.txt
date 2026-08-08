@@ -1,8 +1,6 @@
-Restaurant OS 10.3.2 Period semantics
-Gateway 10.3.2
+Restaurant OS 10.3.3 Period data isolation
+Gateway 10.3.3
 Agent 31.1.0
-Today: live fact + forecast
-Yesterday: completed fact
-7 days: completed rolling-period fact
-Current month: fact-to-date + month forecast
-Previous month: completed fact
+Stale async responses cannot overwrite selected period
+Charts and calculations use explicit request period
+Current/previous month plan uses full calendar month

@@ -385,6 +385,15 @@ class WebSocketAgentClient:
         )
         menu = self._execute_query(menu_sql, menu_args)
 
+        latest_sale_sql, latest_sale_args = self.registry.build(
+            "latest_sale",
+            period,
+        )
+        latest_sale = self._execute_query(
+            latest_sale_sql,
+            latest_sale_args,
+        )
+
         revenue = 0
         checks_count = 0
         if summary.get("rows"):
@@ -419,6 +428,10 @@ class WebSocketAgentClient:
             "menu": {
                 "columns": menu.get("columns") or [],
                 "rows": menu.get("rows") or [],
+            },
+            "latest_sale": {
+                "columns": latest_sale.get("columns") or [],
+                "rows": latest_sale.get("rows") or [],
             },
         }
 

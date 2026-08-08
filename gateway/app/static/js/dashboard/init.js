@@ -143,14 +143,27 @@ function resolveAgentState(lastSignal,reportedOnline){
   };
 }
 
-function lastSaleFromItems(items,fallbackTime){
-  if(!Array.isArray(items)||!items.length) return null;
-  const item=items[0];
+function lastSaleFromSnapshot(latest){
+  const sale=latest?.payload?.latest_sale??latest?.latest_sale;
+  const rows=rowsToObjects(sale);
+  const item=rows[0];
+  if(!item) return null;
   return {
     name:itemName(item),
-    amount:itemRevenue(item),
-    time:item?.last_sale_at??item?.last_sale_time??fallbackTime??null,
+    amount:Number(item?.amount??item?.revenue??item?.line_amount??0),
+    time:item?.sale_at??item?.sale_time??item?.check_date??null,
   };
+}
+
+function peakHourFromSnapshot(latest){
+  const rows=rowsToObjects(latest?.hourly);
+  if(!rows.length) return null;
+  const peak=rows.reduce((best,row)=>
+    Number(row?.revenue??0)>Number(best?.revenue??0)?row:best
+  ,rows[0]);
+  const hour=Number(peak?.sale_hour??peak?.hour);
+  if(!Number.isFinite(hour)) return null;
+  return `${String(hour).padStart(2,"0")}:00–${String((hour+1)%24).padStart(2,"0")}:00`;
 }
 
 const byId=id=>document.getElementById(id);
@@ -213,10 +226,18 @@ function ranges(periodName=period){
   }
 
   if(periodName==="month"){
+    // MTD сравниваем только с сопоставимым отрезком прошлого месяца:
+    // 1..сегодня против 1..того же числа прошлого месяца.
     from.setDate(1);
 
-    pf.setMonth(pf.getMonth()-1,1);
-    pt.setFullYear(pf.getFullYear(),pf.getMonth()+1,0);
+    pf.setFullYear(from.getFullYear(),from.getMonth()-1,1);
+    const previousMonthLastDay=new Date(
+      pf.getFullYear(),
+      pf.getMonth()+1,
+      0
+    ).getDate();
+    const comparableDay=Math.min(to.getDate(),previousMonthLastDay);
+    pt.setFullYear(pf.getFullYear(),pf.getMonth(),comparableDay);
   }
 
   if(periodName==="prevmonth"){
@@ -942,16 +963,23 @@ async function loadDashboard(){
     localTime(latest?.captured_at||latest?.created_at)
   );
 
+  // Аналитические лидеры зависят от выбранного периода.
   const leaders=topItems(menu);
   const leader=leaders.length?itemName(leaders[0]):"Не определён";
-  const lastSale=lastSaleFromItems(
-    leaders,
-    latest?.captured_at||latest?.created_at
-  );
+
+  // «Ресторан сейчас» всегда строится из последнего live snapshot и
+  // не должен меняться при переключении Сегодня/Месяц/Прошлый месяц.
+  const liveLeaders=topItems(latest?.menu);
+  const liveLeader=liveLeaders.length?itemName(liveLeaders[0]):"Не определён";
+  const lastSale=lastSaleFromSnapshot(latest);
   if(lastSale){
     setText("last-sale-name",lastSale.name);
     setText("last-sale-time",lastSale.time?localTime(lastSale.time):"—");
     setText("last-sale-amount",money(lastSale.amount));
+  }else{
+    setText("last-sale-name","Нет данных от агента");
+    setText("last-sale-time","—");
+    setText("last-sale-amount","—");
   }
   const decisions=buildDecisions({
     online,
@@ -969,8 +997,8 @@ async function loadDashboard(){
   });
   renderDecisions(decisions);
 
-  setText("leader",leader);
-  setText("peak-hour",latest?.peak_hour||"Нет данных");
+  setText("leader",liveLeader);
+  setText("peak-hour",peakHourFromSnapshot(latest)||"Нет данных");
   setText(
     "class-c",
     menu?.abc?.C?.count??menu?.class_c_count??"Нет данных"

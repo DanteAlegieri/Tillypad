@@ -30,6 +30,7 @@ class QueryRegistry:
             "sales_summary": self.sales_summary,
             "sales_hourly": self.sales_hourly,
             "menu_items": self.menu_items,
+            "latest_sale": self.latest_sale,
             "delivery_summary": self.delivery_summary,
             "basket_pairs": self.basket_pairs,
             "health_check": self.health_check,
@@ -156,6 +157,39 @@ class QueryRegistry:
               AND ci.chit_Count > 0
             GROUP BY mi.mitm_ID, mi.mitm_Name
             ORDER BY revenue DESC
+            """,
+            [date_from, date_to],
+        )
+
+    def latest_sale(
+        self,
+        parameters: dict[str, Any],
+    ) -> tuple[str, list[Any]]:
+        date_from = self._require_date(parameters.get("date_from"), "date_from")
+        date_to = self._require_date(parameters.get("date_to"), "date_to")
+
+        return (
+            """
+            SELECT TOP (1)
+                mi.mitm_ID AS item_id,
+                mi.mitm_Name AS item_name,
+                c.chck_Date AS sale_at,
+                CAST(ci.chit_Count AS decimal(18,4)) AS quantity,
+                CAST(ci.chit_Count AS decimal(18,4))
+                * (
+                    CAST(ci.chit_Price AS decimal(18,4))
+                    - CAST(ci.chit_PriceDiscount AS decimal(18,4))
+                    + CAST(ci.chit_PriceMargin AS decimal(18,4))
+                ) AS amount
+            FROM dbo.tp_CheckItems AS ci
+            INNER JOIN dbo.tp_Checks AS c
+                ON c.chck_ID = ci.chit_chck_ID
+            INNER JOIN dbo.tp_MenuItems AS mi
+                ON mi.mitm_ID = ci.chit_mitm_ID
+            WHERE c.chck_Date >= ?
+              AND c.chck_Date < DATEADD(day, 1, ?)
+              AND ci.chit_Count > 0
+            ORDER BY c.chck_Date DESC, ci.chit_ID DESC
             """,
             [date_from, date_to],
         )

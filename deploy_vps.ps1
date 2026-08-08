@@ -6,7 +6,7 @@
 
     [string]$RemotePath = "/opt/restaurantos/gateway",
 
-    [string]$ExpectedVersion = "10.3.3",
+    [string]$ExpectedVersion = "10.3.4",
 
     [string]$SshKey = "",
 

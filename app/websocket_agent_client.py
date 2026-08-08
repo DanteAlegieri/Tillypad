@@ -216,7 +216,7 @@ class WebSocketAgentClient:
             type="agent_hello",
             agent_id=self.agent_id,
             payload={
-                "agent_version": "31.4.0",
+                "agent_version": "31.4.1",
                 "hostname": platform.node(),
                 "database_name": os.environ.get(
                     "TILLYPAD_SQL_DATABASE",
@@ -293,10 +293,17 @@ class WebSocketAgentClient:
                     last_error=None,
                 )
                 LOGGER.info(
-                    "Облачный снимок отправлен: дата=%s, выручка=%s, чеков=%s",
+                    "Облачный снимок отправлен: дата=%s, выручка=%s, чеков=%s, оплат=%s",
                     payload.get("business_date"),
                     payload.get("revenue"),
                     payload.get("checks_count"),
+                    len(
+                        (
+                            payload.get("payments")
+                            or {}
+                        ).get("rows")
+                        or []
+                    ),
                 )
             except asyncio.CancelledError:
                 raise
@@ -398,10 +405,28 @@ class WebSocketAgentClient:
             "payment_summary",
             period,
         )
-        payments = self._execute_query(
-            payment_sql,
-            payment_args,
-        )
+        try:
+            payments = self._execute_query(
+                payment_sql,
+                payment_args,
+            )
+            LOGGER.info(
+                "Оплаты: дата=%s, строк=%s",
+                business_date,
+                payments.get("row_count", 0),
+            )
+        except Exception as exc:
+            LOGGER.exception(
+                "Ошибка payment_summary за %s: %s",
+                business_date,
+                exc,
+            )
+            # Sales snapshot must continue even if payment analytics fails.
+            payments = {
+                "columns": [],
+                "rows": [],
+                "row_count": 0,
+            }
 
         revenue = 0
         checks_count = 0
@@ -420,7 +445,7 @@ class WebSocketAgentClient:
 
         return {
             "schema_version": 3,
-            "agent_version": "31.4.0",
+            "agent_version": "31.4.1",
             "business_date": business_date,
             "captured_at": (
                 f"{business_date}T23:59:59+00:00"

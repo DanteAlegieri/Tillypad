@@ -926,7 +926,7 @@ def setup_dashboard_routes(
             request=request,
             name="finance.html",
             context={
-                "app_version": "10.4.3",
+                "app_version": "10.4.4",
                 "product_name": "Restaurant OS",
             },
         )
@@ -942,10 +942,28 @@ def setup_dashboard_routes(
         date_to: str,
     ):
         require_browser_session(request)
+
+        # Lightweight compatibility recovery for snapshots created while
+        # Gateway had not yet migrated to payments_json.
+        storage.recover_payments_from_payloads(agent_id)
+
         return storage.finance_summary(
             agent_id,
             date_from,
             date_to,
+        )
+
+    @router.post(
+        "/api/web/{agent_id}/finance/payments/recover",
+        include_in_schema=False,
+    )
+    def recover_web_finance_payments(
+        agent_id: str,
+        request: Request,
+    ):
+        require_browser_session(request)
+        return storage.recover_payments_from_payloads(
+            agent_id
         )
 
     @router.post(
@@ -1037,7 +1055,7 @@ def setup_dashboard_routes(
             request=request,
             name="settings.html",
             context={
-                "app_version": "10.4.3",
+                "app_version": "10.4.4",
                 "product_name": "Restaurant OS",
             },
         )
@@ -1079,7 +1097,7 @@ def setup_dashboard_routes(
             request=request,
             name="dashboard.html",
             context={
-                "app_version": "10.4.3",
+                "app_version": "10.4.4",
                 "product_name": "Restaurant OS",
             },
         )

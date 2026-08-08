@@ -420,6 +420,82 @@ class GatewayStorage:
             )
         return cursor.rowcount > 0
 
+    def recover_payments_from_payloads(
+        self,
+        agent_id: str | None = None,
+    ) -> dict[str, int]:
+        """
+        Recover payments_json from historical payload_json snapshots.
+        Safe SQLite-only migration; does not touch TillyPad.
+        """
+        recovered = 0
+        inspected = 0
+
+        with self.connect() as connection:
+            if agent_id:
+                rows = connection.execute(
+                    """
+                    SELECT id, payments_json, payload_json
+                    FROM sales_snapshots
+                    WHERE agent_id = ?
+                    ORDER BY id
+                    """,
+                    (agent_id,),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT id, payments_json, payload_json
+                    FROM sales_snapshots
+                    ORDER BY id
+                    """
+                ).fetchall()
+
+            for row in rows:
+                inspected += 1
+
+                try:
+                    existing = json.loads(
+                        row["payments_json"] or "{}"
+                    )
+                except Exception:
+                    existing = {}
+
+                if existing.get("rows"):
+                    continue
+
+                try:
+                    payload = json.loads(
+                        row["payload_json"] or "{}"
+                    )
+                except Exception:
+                    continue
+
+                payments = payload.get("payments") or {}
+                if not payments.get("rows"):
+                    continue
+
+                connection.execute(
+                    """
+                    UPDATE sales_snapshots
+                    SET payments_json = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        json.dumps(
+                            payments,
+                            ensure_ascii=False,
+                        ),
+                        row["id"],
+                    ),
+                )
+                recovered += 1
+
+        return {
+            "inspected": inspected,
+            "recovered": recovered,
+        }
+
     @staticmethod
     def _clean_payment_name(value: Any) -> str:
         text = str(value or "").replace("\x00", "")
@@ -946,10 +1022,27 @@ class GatewayStorage:
             item["menu"] = json.loads(
                 item.pop("menu_json") or "{}"
             )
-            item["payments"] = json.loads(
+
+            payments = json.loads(
                 item.pop("payments_json", "{}") or "{}"
             )
-            item.pop("payload_json", None)
+            payload_raw = item.pop("payload_json", None)
+            payload = {}
+            if payload_raw:
+                try:
+                    payload = json.loads(payload_raw)
+                except Exception:
+                    payload = {}
+
+            # 10.4.3 compatibility:
+            # snapshots already stored before payments_json migration may
+            # contain payments inside the original full payload_json.
+            if not (payments.get("rows") or []):
+                legacy_payments = payload.get("payments") or {}
+                if legacy_payments.get("rows"):
+                    payments = legacy_payments
+
+            item["payments"] = payments
             result.append(item)
         return result
 

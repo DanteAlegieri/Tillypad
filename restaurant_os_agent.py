@@ -51,7 +51,7 @@ from app.service_manager import (
 
 
 APP_NAME = "Restaurant OS Agent"
-VERSION = "31.4.0"
+VERSION = "31.4.1"
 SERVICE_NAME = "RestaurantOSAgent"
 SERVICE_DISPLAY_NAME = "Restaurant OS Agent"
 

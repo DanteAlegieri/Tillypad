@@ -31,3 +31,6 @@
 .payment-reconcile.ok{color:var(--ros-color-success)}.payment-reconcile.warning{color:var(--ros-color-warning)}
 @media(max-width:1250px){.payment-types{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){.payment-types{grid-template-columns:1fr}.payment-summary-line{grid-template-columns:1fr}}
+
+.payment-head-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.payment-recover-button{font-size:11px;padding:7px 10px;min-height:auto}

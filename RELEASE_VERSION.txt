@@ -1,4 +1,4 @@
-Restaurant OS 10.4.3 Payment types in Finance
-Gateway 10.4.3
-Agent 31.4.0
-Real TillyPad payment breakdown from tp_CheckPayments + tp_Checks + tp_PayTypes
+Restaurant OS 10.4.4 Payment recovery
+Gateway 10.4.4
+Agent 31.4.1
+Recover historical payment data from payload_json and add detailed payment logs

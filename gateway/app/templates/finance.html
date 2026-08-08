@@ -5,9 +5,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Финансы — Restaurant OS</title>
-<link rel="stylesheet" href="/static/css/foundation.css?v=10.4.3">
-<link rel="stylesheet" href="/static/css/dashboard.css?v=10.4.3">
-<link rel="stylesheet" href="/static/css/finance.css?v=10.4.3">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.4.4">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.4.4">
+<link rel="stylesheet" href="/static/css/finance.css?v=10.4.4">
 </head>
 <body>
 <div class="layout">
@@ -64,7 +64,10 @@
      <h3>Типы оплат</h3>
      <span>фактически проведённые оплаты TillyPad</span>
     </div>
-    <div class="payment-reconcile" id="payment-reconcile">Проверяю сверку…</div>
+    <div class="payment-head-actions">
+     <button class="ros-button payment-recover-button" id="recover-payments-button">Восстановить историю оплат</button>
+     <div class="payment-reconcile" id="payment-reconcile">Проверяю сверку…</div>
+    </div>
    </div>
    <div class="payment-types" id="payment-types"></div>
    <div class="payment-summary-line">
@@ -145,6 +148,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<script src="/static/js/finance.js?v=10.4.3"></script>
+<script src="/static/js/finance.js?v=10.4.4"></script>
 </body>
 </html>

@@ -187,6 +187,31 @@ function renderChart(rows){
  },true);
 }
 
+async function recoverPayments(){
+ const button=byId("recover-payments-button");
+ button.disabled=true;
+ const previous=button.textContent;
+ button.textContent="Восстанавливаю…";
+
+ try{
+  const result=await api(
+   `/api/web/${agent}/finance/payments/recover`,
+   {method:"POST"}
+  );
+  button.textContent=`Восстановлено: ${Number(result.recovered||0)}`;
+  await loadFinance();
+ }catch(error){
+  button.textContent="Ошибка восстановления";
+  alert(error.message);
+ }finally{
+  setTimeout(()=>{
+   button.disabled=false;
+   button.textContent=previous;
+  },2500);
+ }
+}
+
+
 async function loadFinance(){
  const range=rangeFor(period);
  setText("finance-hero-title","Загружаю финансы…");
@@ -255,6 +280,7 @@ async function initialize(){
  });
  byId("add-operation-button").onclick=()=>openModal();
  byId("add-operation-button-secondary").onclick=()=>openModal();
+ byId("recover-payments-button").onclick=recoverPayments;
  byId("finance-modal-close").onclick=closeModal;
  byId("finance-cancel").onclick=closeModal;
  byId("operation-type").onchange=()=>fillCategories(byId("operation-type").value);

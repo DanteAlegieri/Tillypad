@@ -5,9 +5,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Финансы — Restaurant OS</title>
-<link rel="stylesheet" href="/static/css/foundation.css?v=10.5.0">
-<link rel="stylesheet" href="/static/css/dashboard.css?v=10.5.0">
-<link rel="stylesheet" href="/static/css/finance.css?v=10.5.0">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.5.1">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.5.1">
+<link rel="stylesheet" href="/static/css/finance.css?v=10.5.1">
 </head>
 <body>
 <div class="layout">
@@ -112,20 +112,32 @@
    </article>
   </section>
 
-  <section class="ros-card finance-panel finance-purchases-panel">
-   <div class="finance-panel-head">
+  <section class="ros-card finance-panel finance-purchases-panel finance-purchases-panel--compact">
+   <div class="finance-panel-head finance-purchases-head">
     <div>
      <h3>Закупки по приходным накладным</h3>
      <span>автоматически из TillyPad</span>
     </div>
-    <strong id="purchases-total">—</strong>
+    <div class="finance-purchases-head-right">
+     <strong id="purchases-total">—</strong>
+     <button type="button" class="purchases-toggle" id="purchases-toggle">Показать все</button>
+    </div>
    </div>
-   <div class="purchases-summary">
-    <div><span>Документов</span><strong id="purchases-documents">—</strong></div>
-    <div><span>Сумма НДС</span><strong id="purchases-vat">—</strong></div>
-    <div><span>Крупнейший поставщик</span><strong id="purchases-top-supplier">—</strong></div>
+   <div class="purchases-summary purchases-summary--compact">
+    <div>
+     <span>Документов</span>
+     <strong id="purchases-documents">—</strong>
+    </div>
+    <div>
+     <span>НДС</span>
+     <strong id="purchases-vat">—</strong>
+    </div>
+    <div class="purchases-summary-supplier">
+     <span>Крупнейший поставщик</span>
+     <strong id="purchases-top-supplier">—</strong>
+    </div>
    </div>
-   <div class="purchases-list" id="purchases-list"></div>
+   <div class="purchases-list purchases-list--compact" id="purchases-list"></div>
   </section>
 
   <section class="finance-grid">
@@ -185,6 +197,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<script src="/static/js/finance.js?v=10.5.0"></script>
+<script src="/static/js/finance.js?v=10.5.1"></script>
 </body>
 </html>

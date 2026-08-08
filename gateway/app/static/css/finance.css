@@ -192,3 +192,94 @@
  .purchases-summary{grid-template-columns:1fr}
  .purchase-row{align-items:flex-start}
 }
+
+
+/* 10.5.1 — compact purchases block */
+.finance-purchases-panel--compact{
+ margin-bottom:14px;
+ padding-bottom:14px;
+}
+.finance-purchases-head{
+ align-items:center;
+ margin-bottom:10px;
+}
+.finance-purchases-head-right{
+ display:flex;
+ align-items:center;
+ gap:12px;
+}
+.finance-purchases-head-right>strong{
+ font-size:18px;
+ white-space:nowrap;
+}
+.purchases-toggle{
+ border:0;
+ background:transparent;
+ color:#176da3;
+ font:inherit;
+ font-size:11px;
+ font-weight:800;
+ cursor:pointer;
+ padding:5px 0;
+}
+.purchases-toggle:hover{
+ text-decoration:underline;
+}
+.purchases-summary--compact{
+ display:grid;
+ grid-template-columns:120px 140px minmax(220px,1fr);
+ gap:8px;
+ margin-bottom:8px;
+}
+.purchases-summary--compact>div{
+ padding:9px 12px;
+ min-height:54px;
+ display:flex;
+ flex-direction:column;
+ justify-content:center;
+}
+.purchases-summary--compact span{
+ margin-bottom:2px;
+ font-size:10px;
+}
+.purchases-summary--compact strong{
+ font-size:13px;
+ line-height:1.25;
+}
+.purchases-list--compact{
+ border-top:1px solid var(--ros-color-border);
+}
+.purchase-row--compact{
+ min-height:0;
+ padding:7px 2px;
+}
+.purchase-row--compact .purchase-row-main{
+ min-width:0;
+}
+.purchase-row--compact .purchase-row-main>strong{
+ font-size:12px;
+}
+.purchase-row--compact small{
+ margin-top:2px;
+ font-size:10px;
+}
+.purchase-row-amount{
+ font-size:12px;
+}
+.finance-empty--compact{
+ padding:12px 4px;
+ font-size:12px;
+}
+@media(max-width:800px){
+ .purchases-summary--compact{
+  grid-template-columns:1fr 1fr;
+ }
+ .purchases-summary-supplier{
+  grid-column:1/-1;
+ }
+ .finance-purchases-head-right{
+  align-items:flex-end;
+  flex-direction:column;
+  gap:3px;
+ }
+}

@@ -168,6 +168,34 @@ function renderPayments(payments,revenue){
 }
 
 
+let purchasesExpanded=false;
+let currentPurchasesDocuments=[];
+
+function renderPurchasesRows(){
+ const node=byId("purchases-list");
+ const button=byId("purchases-toggle");
+ const documents=currentPurchasesDocuments||[];
+
+ if(!documents.length){
+  node.innerHTML='<div class="finance-empty finance-empty--compact">За выбранный период проведённых приходных накладных нет</div>';
+  button.hidden=true;
+  return;
+ }
+
+ button.hidden=documents.length<=4;
+ button.textContent=purchasesExpanded?"Свернуть":"Показать все";
+
+ const visible=purchasesExpanded?documents:documents.slice(0,4);
+ node.innerHTML=visible.map(item=>`
+  <div class="purchase-row purchase-row--compact">
+   <div class="purchase-row-main">
+    <strong>${item.document_name||"Приходная накладная"}</strong>
+    <small>${item.document_date||"—"} · ${item.supplier_name||"Поставщик не указан"} · ${Number(item.items_count||0)} поз.</small>
+   </div>
+   <strong class="purchase-row-amount">${money(item.amount||0)}</strong>
+  </div>`).join("");
+}
+
 function renderPurchases(purchases){
  setText("purchases-total",money(purchases.total||0));
  setText("purchases-documents",String(purchases.documents_count||0));
@@ -179,21 +207,9 @@ function renderPurchases(purchases){
   top?`${top.supplier} · ${money(top.amount)}`:"—"
  );
 
- const node=byId("purchases-list");
- const documents=purchases.documents||[];
- if(!documents.length){
-  node.innerHTML='<div class="finance-empty">За выбранный период проведённых приходных накладных нет</div>';
-  return;
- }
-
- node.innerHTML=documents.slice(0,12).map(item=>`
-  <div class="purchase-row">
-   <div>
-    <strong>${item.document_name||"Приходная накладная"}</strong>
-    <small>${item.document_date||"—"} · ${item.supplier_name||"Поставщик не указан"} · ${Number(item.items_count||0)} поз.</small>
-   </div>
-   <strong>${money(item.amount||0)}</strong>
-  </div>`).join("");
+ currentPurchasesDocuments=purchases.documents||[];
+ purchasesExpanded=false;
+ renderPurchasesRows();
 }
 
 
@@ -353,6 +369,10 @@ async function initialize(){
  byId("add-operation-button").onclick=()=>openModal();
  byId("add-operation-button-secondary").onclick=()=>openModal();
  byId("recover-payments-button").onclick=recoverPayments;
+ byId("purchases-toggle").onclick=()=>{
+  purchasesExpanded=!purchasesExpanded;
+  renderPurchasesRows();
+ };
  byId("finance-modal-close").onclick=closeModal;
  byId("finance-cancel").onclick=closeModal;
  byId("operation-type").onchange=()=>fillCategories(byId("operation-type").value);

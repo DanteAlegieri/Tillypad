@@ -624,6 +624,45 @@ class GatewayStorage:
             "recovered": recovered,
         }
 
+    def recover_purchases_from_payloads(
+        self,
+        agent_id: str | None = None,
+    ) -> dict[str, int]:
+        """Recover purchases_json from payload_json for existing snapshots."""
+        recovered = 0
+        inspected = 0
+        with self.connect() as connection:
+            if agent_id:
+                rows = connection.execute(
+                    "SELECT id, purchases_json, payload_json FROM sales_snapshots WHERE agent_id = ? ORDER BY id",
+                    (agent_id,),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT id, purchases_json, payload_json FROM sales_snapshots ORDER BY id"
+                ).fetchall()
+            for row in rows:
+                inspected += 1
+                try:
+                    existing = json.loads(row["purchases_json"] or "{}")
+                except Exception:
+                    existing = {}
+                if existing.get("rows"):
+                    continue
+                try:
+                    payload = json.loads(row["payload_json"] or "{}")
+                except Exception:
+                    continue
+                purchases = payload.get("purchases") or {}
+                if not purchases.get("rows"):
+                    continue
+                connection.execute(
+                    "UPDATE sales_snapshots SET purchases_json = ? WHERE id = ?",
+                    (json.dumps(purchases, ensure_ascii=False), row["id"]),
+                )
+                recovered += 1
+        return {"inspected": inspected, "recovered": recovered}
+
     @staticmethod
     def _clean_payment_name(value: Any) -> str:
         text = str(value or "").replace("\x00", "")
@@ -1402,21 +1441,19 @@ class GatewayStorage:
                 """
                 SELECT s.*
                 FROM sales_snapshots AS s
-                INNER JOIN (
-                    SELECT
-                        business_date,
-                        MAX(captured_at) AS captured_at
-                    FROM sales_snapshots
-                    WHERE agent_id = ?
-                      AND business_date BETWEEN ? AND ?
-                    GROUP BY business_date
-                ) AS latest
-                    ON latest.business_date = s.business_date
-                   AND latest.captured_at = s.captured_at
                 WHERE s.agent_id = ?
+                  AND s.business_date BETWEEN ? AND ?
+                  AND s.id = (
+                      SELECT s2.id
+                      FROM sales_snapshots AS s2
+                      WHERE s2.agent_id = s.agent_id
+                        AND s2.business_date = s.business_date
+                      ORDER BY s2.received_at DESC, s2.id DESC
+                      LIMIT 1
+                  )
                 ORDER BY s.business_date
                 """,
-                (agent_id, date_from, date_to, agent_id),
+                (agent_id, date_from, date_to),
             ).fetchall()
 
         result: list[dict[str, Any]] = []

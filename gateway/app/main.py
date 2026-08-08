@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Restaurant Gateway",
-    version="10.4.9",
+    version="10.5.0",
 )
 storage = GatewayStorage(settings.database_path)
 event_repository = SQLiteEventRepository(settings.database_path)

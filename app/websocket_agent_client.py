@@ -485,7 +485,7 @@ class WebSocketAgentClient:
 
         return {
             "schema_version": 4,
-            "agent_version": "31.4.1",
+            "agent_version": "31.5.1",
             "business_date": business_date,
             "captured_at": (
                 f"{business_date}T23:59:59+00:00"

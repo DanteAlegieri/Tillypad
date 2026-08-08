@@ -274,7 +274,7 @@ function periodPresentation(range){
       revenue:`Выручка за ${monthName(range.fromDate.getMonth()).toLowerCase()}`,
       average:`Средний чек за ${monthName(range.fromDate.getMonth()).toLowerCase()}`,
       checks:`Чеков за ${monthName(range.fromDate.getMonth()).toLowerCase()}`,
-      forecast:"Итог текущего месяца",
+      forecast:"Прогноз месяца",
       hero:`За ${monthName(range.fromDate.getMonth()).toLowerCase()}`,
     };
   }
@@ -483,17 +483,34 @@ function calculateRestaurantScore({
 }
 
 function calculateForecast(currentRevenue,periodName){
-  if(periodName!=="today") return currentRevenue;
+  if(periodName==="today"){
+    const now=new Date();
+    const hour=now.getHours()+now.getMinutes()/60;
+    const serviceStart=10;
+    const serviceEnd=22;
+    const elapsed=Math.max(.5,Math.min(serviceEnd-serviceStart,hour-serviceStart));
+    const fullDay=serviceEnd-serviceStart;
 
-  const now=new Date();
-  const hour=now.getHours()+now.getMinutes()/60;
-  const serviceStart=10;
-  const serviceEnd=22;
-  const elapsed=Math.max(.5,Math.min(serviceEnd-serviceStart,hour-serviceStart));
-  const fullDay=serviceEnd-serviceStart;
+    if(hour<=serviceStart) return currentRevenue;
+    return Math.round(currentRevenue*(fullDay/elapsed));
+  }
 
-  if(hour<=serviceStart) return currentRevenue;
-  return Math.round(currentRevenue*(fullDay/elapsed));
+  if(periodName==="month"){
+    const now=new Date();
+    const elapsedDays=Math.max(1,now.getDate());
+    const totalDays=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    return Math.round(currentRevenue/elapsedDays*totalDays);
+  }
+
+  return currentRevenue;
+}
+
+function isForecastPeriod(periodName){
+  return periodName==="today"||periodName==="month";
+}
+
+function isCompletedPeriod(periodName){
+  return periodName==="yesterday"||periodName==="prevmonth";
 }
 
 function buildDecisions({
@@ -508,18 +525,31 @@ function buildDecisions({
   currentRevenue,
   forecastRevenue,
   revenuePlan,
+  periodName,
 }){
   const decisions=[];
-  const forecastGap=Math.max(0,revenuePlan-forecastRevenue);
+  const usesForecast=isForecastPeriod(periodName);
+  const comparisonRevenue=usesForecast?forecastRevenue:currentRevenue;
+  const forecastGap=Math.max(0,revenuePlan-comparisonRevenue);
   const leaderPrice=leaderUnitPrice(leaderItem);
   const requiredLeaderSales=salesNeeded(forecastGap,leaderPrice);
 
   if(hasData&&forecastGap>0&&requiredLeaderSales!==null){
+    const completed=isCompletedPeriod(periodName);
+    const rolling=periodName==="week";
     decisions.push({
-      severity:"critical",
-      title:"Закрыть разрыв до плана",
-      text:`При текущем темпе прогноз ниже плана на ${money(forecastGap)}. Для компенсации нужно примерно ${integer(requiredLeaderSales)} продаж позиции «${leader}».`,
-      meta:"Срочно",
+      severity:completed||rolling?"warning":"critical",
+      title:completed
+        ?"План периода не выполнен"
+        :rolling
+          ?"Разрыв до плана за 7 дней"
+          :"Закрыть разрыв до плана",
+      text:completed
+        ?`Факт ниже плана на ${money(forecastGap)}. Для ориентира это примерно ${integer(requiredLeaderSales)} продаж позиции «${leader}».`
+        :rolling
+          ?`За выбранные 7 дней выручка ниже плана на ${money(forecastGap)}. Это примерно ${integer(requiredLeaderSales)} продаж позиции «${leader}».`
+          :`При текущем темпе прогноз ниже плана на ${money(forecastGap)}. Для компенсации нужно примерно ${integer(requiredLeaderSales)} продаж позиции «${leader}».`,
+      meta:completed?"Итог":rolling?"Период":"Срочно",
       effect:`До плана ${money(forecastGap)}`,
     });
   }
@@ -782,9 +812,17 @@ async function loadDashboard(){
   );
   setText(
     "plan-forecast-status",
-    forecastGap>0
-      ?`Прогноз ниже плана на ${money(forecastGap)}`
-      :`Прогноз выполняет план на ${forecastPercent.toFixed(1)}%`
+    isForecastPeriod(period)
+      ?(
+        forecastGap>0
+          ?`Прогноз ниже плана на ${money(forecastGap)}`
+          :`Прогноз выполняет план на ${forecastPercent.toFixed(1)}%`
+      )
+      :(
+        planGap>0
+          ?`Факт ниже плана на ${money(planGap)}`
+          :`Факт выше плана на ${money(current.revenue-revenuePlan)}`
+      )
   );
 
   const planFill=byId("plan-progress-fill");
@@ -905,6 +943,7 @@ async function loadDashboard(){
     currentRevenue:current.revenue,
     forecastRevenue,
     revenuePlan,
+    periodName:period,
   });
   renderDecisions(decisions);
 

@@ -26,9 +26,11 @@ import win32security
 import pywintypes
 
 from app.agent_diagnostics import (
+    discover_payment_schema,
     export_support_report,
     load_env_file,
     run_all,
+    save_payment_schema_report,
 )
 from app.websocket_agent_client import WebSocketAgentClient
 from app.sql_autodetect import (
@@ -49,7 +51,7 @@ from app.service_manager import (
 
 
 APP_NAME = "Restaurant OS Agent"
-VERSION = "31.1.0"
+VERSION = "31.2.0"
 SERVICE_NAME = "RestaurantOSAgent"
 SERVICE_DISPLAY_NAME = "Restaurant OS Agent"
 
@@ -749,6 +751,18 @@ class ConfigWindow(tk.Tk):
             command=self.export_report,
         ).pack(side="left", padx=8)
 
+        ttk.Button(
+            diag_controls,
+            text="Найти таблицы оплат",
+            command=self.run_payment_schema_probe,
+        ).pack(side="left", padx=8)
+
+        ttk.Button(
+            diag_controls,
+            text="Сохранить оплаты",
+            command=self.export_payment_schema,
+        ).pack(side="left")
+
         ttk.Label(
             service,
             textvariable=self.service_status,
@@ -988,6 +1002,127 @@ class ConfigWindow(tk.Tk):
         messagebox.showinfo(
             APP_NAME,
             "Отчёт сохранён.",
+        )
+
+    def run_payment_schema_probe(self):
+        self.save(show_message=False)
+        self.status.set(
+            "Ищу реальные таблицы и поля оплат в TillyPad..."
+        )
+        threading.Thread(
+            target=self._payment_schema_worker,
+            daemon=True,
+        ).start()
+
+    def _payment_schema_worker(self):
+        try:
+            report = discover_payment_schema(
+                self.collect()
+            )
+            self.payment_schema_report = report
+            self.after(
+                0,
+                lambda: self.show_payment_schema(report),
+            )
+        except Exception as exc:
+            self.payment_schema_report = None
+            self.after(
+                0,
+                lambda: messagebox.showerror(
+                    APP_NAME,
+                    "Не удалось исследовать таблицы оплат:\n"
+                    + str(exc),
+                ),
+            )
+            self.after(
+                0,
+                lambda: self.status.set(
+                    "Поиск таблиц оплат завершился ошибкой"
+                ),
+            )
+
+    def show_payment_schema(self, report):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        tables = report.get("candidate_tables") or []
+        relationships = report.get("relationships") or []
+
+        if not tables:
+            self.tree.insert(
+                "",
+                "end",
+                values=(
+                    "Инфо",
+                    "Совпадений по названиям таблиц/полей оплат не найдено",
+                    "—",
+                ),
+            )
+        else:
+            for table in tables[:80]:
+                keywords = ", ".join(
+                    table.get("matched_keywords") or []
+                )
+                columns = ", ".join(
+                    column.get("name", "")
+                    for column in (
+                        table.get("columns") or []
+                    )[:12]
+                )
+                if len(table.get("columns") or []) > 12:
+                    columns += ", …"
+
+                self.tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        "Найдено",
+                        (
+                            f"{table.get('schema')}."
+                            f"{table.get('table')} | "
+                            f"ключи: {keywords} | "
+                            f"поля: {columns}"
+                        ),
+                        "—",
+                    ),
+                )
+
+        self.status.set(
+            "Поиск оплат: "
+            f"{len(tables)} таблиц-кандидатов, "
+            f"{len(relationships)} связей. "
+            "Сохраните JSON и пришлите его."
+        )
+
+    def export_payment_schema(self):
+        if not self.payment_schema_report:
+            messagebox.showwarning(
+                APP_NAME,
+                (
+                    "Сначала нажмите "
+                    "«Найти таблицы оплат»."
+                ),
+            )
+            return
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            initialfile="tillypad_payment_schema.json",
+            filetypes=[("JSON", "*.json")],
+        )
+        if not filename:
+            return
+
+        save_payment_schema_report(
+            self.payment_schema_report,
+            Path(filename),
+        )
+        messagebox.showinfo(
+            APP_NAME,
+            (
+                "Отчёт по структуре оплат сохранён.\n\n"
+                "Пришлите этот JSON в чат."
+            ),
         )
 
     def refresh_service(self):

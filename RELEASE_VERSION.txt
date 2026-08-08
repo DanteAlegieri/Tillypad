@@ -1,4 +1,4 @@
-Restaurant OS 10.4.0 Finance v1
-Gateway 10.4.0
-Agent 31.1.0
-Finance workspace with real sales revenue and manual operations
+Restaurant OS 10.4.1 Payment schema diagnostics
+Gateway 10.4.1
+Agent 31.2.0
+Read-only SQL metadata discovery for payment tables and columns

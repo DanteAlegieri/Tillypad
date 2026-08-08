@@ -90,6 +90,22 @@ class GatewayStorage:
                     daily_revenue_plan REAL NOT NULL DEFAULT 10000,
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS finance_operations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    agent_id TEXT NOT NULL,
+                    operation_date TEXT NOT NULL,
+                    operation_type TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS
+                    idx_finance_operations_agent_date
+                ON finance_operations(agent_id, operation_date);
                 """
             )
             self._ensure_column(
@@ -222,6 +238,299 @@ class GatewayStorage:
             "daily_revenue_plan": plan,
             "updated_at": updated_at,
         }
+
+    def list_finance_operations(
+        self,
+        agent_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    agent_id,
+                    operation_date,
+                    operation_type,
+                    category,
+                    amount,
+                    description,
+                    created_at,
+                    updated_at
+                FROM finance_operations
+                WHERE agent_id = ?
+                  AND operation_date BETWEEN ? AND ?
+                ORDER BY operation_date DESC, id DESC
+                """,
+                (agent_id, date_from, date_to),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def create_finance_operation(
+        self,
+        agent_id: str,
+        *,
+        operation_date: str,
+        operation_type: str,
+        category: str,
+        amount: float,
+        description: str = "",
+    ) -> dict[str, Any]:
+        operation_type = str(operation_type).strip().lower()
+        if operation_type not in {"income", "expense"}:
+            raise ValueError("Некорректный тип финансовой операции")
+
+        category = str(category).strip()
+        if not category:
+            raise ValueError("Категория обязательна")
+
+        amount = round(float(amount), 2)
+        if amount <= 0:
+            raise ValueError("Сумма должна быть больше нуля")
+
+        now = utc_now()
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO finance_operations (
+                    agent_id,
+                    operation_date,
+                    operation_type,
+                    category,
+                    amount,
+                    description,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    agent_id,
+                    operation_date,
+                    operation_type,
+                    category,
+                    amount,
+                    str(description or "").strip(),
+                    now,
+                    now,
+                ),
+            )
+            operation_id = int(cursor.lastrowid)
+
+        return self.get_finance_operation(
+            agent_id,
+            operation_id,
+        )
+
+    def get_finance_operation(
+        self,
+        agent_id: str,
+        operation_id: int,
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM finance_operations
+                WHERE agent_id = ?
+                  AND id = ?
+                """,
+                (agent_id, operation_id),
+            ).fetchone()
+
+        if row is None:
+            raise KeyError("Финансовая операция не найдена")
+        return dict(row)
+
+    def update_finance_operation(
+        self,
+        agent_id: str,
+        operation_id: int,
+        *,
+        operation_date: str,
+        operation_type: str,
+        category: str,
+        amount: float,
+        description: str = "",
+    ) -> dict[str, Any]:
+        operation_type = str(operation_type).strip().lower()
+        if operation_type not in {"income", "expense"}:
+            raise ValueError("Некорректный тип финансовой операции")
+
+        category = str(category).strip()
+        if not category:
+            raise ValueError("Категория обязательна")
+
+        amount = round(float(amount), 2)
+        if amount <= 0:
+            raise ValueError("Сумма должна быть больше нуля")
+
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE finance_operations
+                SET operation_date = ?,
+                    operation_type = ?,
+                    category = ?,
+                    amount = ?,
+                    description = ?,
+                    updated_at = ?
+                WHERE agent_id = ?
+                  AND id = ?
+                """,
+                (
+                    operation_date,
+                    operation_type,
+                    category,
+                    amount,
+                    str(description or "").strip(),
+                    utc_now(),
+                    agent_id,
+                    operation_id,
+                ),
+            )
+            if cursor.rowcount == 0:
+                raise KeyError("Финансовая операция не найдена")
+
+        return self.get_finance_operation(
+            agent_id,
+            operation_id,
+        )
+
+    def delete_finance_operation(
+        self,
+        agent_id: str,
+        operation_id: int,
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM finance_operations
+                WHERE agent_id = ?
+                  AND id = ?
+                """,
+                (agent_id, operation_id),
+            )
+        return cursor.rowcount > 0
+
+    def finance_summary(
+        self,
+        agent_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> dict[str, Any]:
+        sales = self.sales_history(
+            agent_id,
+            date_from,
+            date_to,
+        )
+        revenue = round(
+            sum(float(item.get("revenue") or 0) for item in sales),
+            2,
+        )
+
+        operations = self.list_finance_operations(
+            agent_id,
+            date_from,
+            date_to,
+        )
+        manual_income = round(
+            sum(
+                float(item["amount"])
+                for item in operations
+                if item["operation_type"] == "income"
+            ),
+            2,
+        )
+        expenses = round(
+            sum(
+                float(item["amount"])
+                for item in operations
+                if item["operation_type"] == "expense"
+            ),
+            2,
+        )
+        operating_result = round(
+            revenue + manual_income - expenses,
+            2,
+        )
+
+        categories: dict[str, float] = {}
+        for item in operations:
+            if item["operation_type"] != "expense":
+                continue
+            category = str(item["category"])
+            categories[category] = round(
+                categories.get(category, 0.0)
+                + float(item["amount"]),
+                2,
+            )
+
+        daily: dict[str, dict[str, float]] = {}
+        for item in sales:
+            day = str(item.get("business_date") or "")
+            if not day:
+                continue
+            daily.setdefault(
+                day,
+                {"revenue": 0.0, "income": 0.0, "expenses": 0.0},
+            )
+            daily[day]["revenue"] = round(
+                daily[day]["revenue"]
+                + float(item.get("revenue") or 0),
+                2,
+            )
+
+        for item in operations:
+            day = str(item["operation_date"])
+            daily.setdefault(
+                day,
+                {"revenue": 0.0, "income": 0.0, "expenses": 0.0},
+            )
+            key = (
+                "income"
+                if item["operation_type"] == "income"
+                else "expenses"
+            )
+            daily[day][key] = round(
+                daily[day][key]
+                + float(item["amount"]),
+                2,
+            )
+
+        margin = (
+            round(operating_result / revenue * 100, 1)
+            if revenue > 0
+            else None
+        )
+
+        return {
+            "agent_id": agent_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "revenue": revenue,
+            "manual_income": manual_income,
+            "expenses": expenses,
+            "operating_result": operating_result,
+            "operating_margin": margin,
+            "cost_of_goods": None,
+            "gross_profit": None,
+            "categories": [
+                {"category": key, "amount": value}
+                for key, value in sorted(
+                    categories.items(),
+                    key=lambda item: item[1],
+                    reverse=True,
+                )
+            ],
+            "daily": [
+                {"date": day, **values}
+                for day, values in sorted(daily.items())
+            ],
+            "operations": operations,
+        }
+
 
     def create_agent(
         self,

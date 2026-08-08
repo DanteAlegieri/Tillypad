@@ -1,0 +1,134 @@
+{% from 'components/sidebar.html' import restaurant_sidebar %}
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Финансы — Restaurant OS</title>
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.4.0">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.4.0">
+<link rel="stylesheet" href="/static/css/finance.css?v=10.4.0">
+</head>
+<body>
+<div class="layout">
+ {{ restaurant_sidebar('finance', app_version) }}
+ <main class="finance-page">
+  <header class="finance-header">
+   <div>
+    <h1>Финансы</h1>
+    <p>Финансовый рабочий стол владельца</p>
+   </div>
+   <div class="finance-header-actions">
+    <div class="period-controls" id="finance-periods">
+     <button data-period="today">Сегодня</button>
+     <button data-period="yesterday">Вчера</button>
+     <button data-period="week">7 дней</button>
+     <button data-period="month" class="is-active">Этот месяц</button>
+     <button data-period="prevmonth">Прошлый месяц</button>
+    </div>
+    <select id="finance-agent-select"></select>
+   </div>
+  </header>
+
+  <section class="finance-hero ros-card">
+   <div>
+    <span class="eyebrow">ФИНАНСОВЫЙ РЕЗУЛЬТАТ</span>
+    <h2 id="finance-hero-title">Загружаю финансы…</h2>
+    <p id="finance-hero-text">Собираю продажи и ручные финансовые операции.</p>
+   </div>
+   <button class="ros-button ros-button--primary" id="add-operation-button">+ Добавить операцию</button>
+  </section>
+
+  <section class="finance-kpis">
+   <article class="ros-card finance-kpi">
+    <span>Выручка</span><strong id="finance-revenue">—</strong>
+    <small>из продаж Restaurant OS</small>
+   </article>
+   <article class="ros-card finance-kpi">
+    <span>Расходы</span><strong id="finance-expenses">—</strong>
+    <small>ручные операции</small>
+   </article>
+   <article class="ros-card finance-kpi">
+    <span>Прочие доходы</span><strong id="finance-income">—</strong>
+    <small>не включая продажи</small>
+   </article>
+   <article class="ros-card finance-kpi finance-kpi--result">
+    <span>Операционный результат</span><strong id="finance-result">—</strong>
+    <small id="finance-margin">Рентабельность —</small>
+   </article>
+  </section>
+
+  <section class="finance-grid">
+   <article class="ros-card finance-panel finance-chart-panel">
+    <div class="finance-panel-head">
+     <div><h3>Доходы и расходы</h3><span id="finance-range-label">—</span></div>
+    </div>
+    <div id="finance-chart" class="finance-chart"></div>
+   </article>
+
+   <article class="ros-card finance-panel">
+    <div class="finance-panel-head"><h3>Структура расходов</h3><span>по категориям</span></div>
+    <div id="expense-categories" class="expense-categories"></div>
+   </article>
+  </section>
+
+  <section class="finance-grid">
+   <article class="ros-card finance-panel">
+    <div class="finance-panel-head"><h3>Себестоимость и валовая прибыль</h3><span>источник данных</span></div>
+    <div class="finance-source-empty">
+     <strong>Себестоимость пока не подключена</strong>
+     <p>Не подменяем её приблизительным расчётом. Позже подключим фактическую себестоимость из TillyPad/TillyStock.</p>
+    </div>
+   </article>
+
+   <article class="ros-card finance-panel">
+    <div class="finance-panel-head"><h3>Что влияет на прибыль</h3><span>автоматический вывод</span></div>
+    <div id="finance-insights" class="finance-insights"></div>
+   </article>
+  </section>
+
+  <section class="ros-card finance-panel">
+   <div class="finance-panel-head">
+    <div><h3>Финансовые операции</h3><span>ручной учёт</span></div>
+    <button class="ros-button" id="add-operation-button-secondary">+ Добавить</button>
+   </div>
+   <div class="finance-table-wrap">
+    <table class="finance-table">
+     <thead><tr><th>Дата</th><th>Тип</th><th>Категория</th><th>Описание</th><th>Сумма</th><th></th></tr></thead>
+     <tbody id="finance-operations"></tbody>
+    </table>
+   </div>
+  </section>
+ </main>
+</div>
+
+<div class="finance-modal-backdrop" id="finance-modal" hidden>
+ <form class="finance-modal" id="finance-form">
+  <div class="finance-modal-head">
+   <div><span class="eyebrow">РУЧНАЯ ОПЕРАЦИЯ</span><h2 id="finance-modal-title">Добавить операцию</h2></div>
+   <button type="button" class="finance-modal-close" id="finance-modal-close">×</button>
+  </div>
+  <input type="hidden" id="operation-id">
+  <label>Дата<input type="date" id="operation-date" required></label>
+  <label>Тип
+   <select id="operation-type">
+    <option value="expense">Расход</option>
+    <option value="income">Прочий доход</option>
+   </select>
+  </label>
+  <label>Категория
+   <select id="operation-category"></select>
+  </label>
+  <label>Сумма, ₽<input type="number" id="operation-amount" min="0.01" step="0.01" required></label>
+  <label>Комментарий<textarea id="operation-description" rows="3" maxlength="500"></textarea></label>
+  <div class="finance-modal-actions">
+   <button type="button" class="ros-button" id="finance-cancel">Отмена</button>
+   <button type="submit" class="ros-button ros-button--primary">Сохранить</button>
+  </div>
+ </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="/static/js/finance.js?v=10.4.0"></script>
+</body>
+</html>

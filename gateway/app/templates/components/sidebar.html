@@ -8,7 +8,7 @@
   <div class="nav-title">Управление</div>
   <a href="/dashboard-old"><i>◆</i><span>Центр решений</span></a>
   <a href="/dashboard-old"><i>◒</i><span>Меню</span></a>
-  <a href="/dashboard-old"><i>₽</i><span>Финансы</span></a>
+  <a class="{{ 'active' if active_page == 'finance' else '' }}" href="/finance"><i>₽</i><span>Финансы</span></a>
   <a href="/dashboard-old"><i>→</i><span>Доставка</span></a>
   <div class="nav-title">Система</div>
   <a class="{{ 'active' if active_page == 'settings' else '' }}" href="/settings"><i>⚙</i><span>Настройки</span></a>

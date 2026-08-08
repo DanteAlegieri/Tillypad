@@ -35,6 +35,15 @@ class RestaurantSettingsUpdate(BaseModel):
 
 
 
+class FinanceOperationPayload(BaseModel):
+    operation_date: date
+    operation_type: str = Field(pattern="^(income|expense)$")
+    category: str = Field(min_length=1, max_length=120)
+    amount: float = Field(gt=0, le=1_000_000_000)
+    description: str = Field(default="", max_length=500)
+
+
+
 
 LOGIN_HTML = r"""
 <!doctype html>
@@ -907,6 +916,117 @@ def setup_dashboard_routes(
         return HTMLResponse('\n<!doctype html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>Restaurant OS 6</title>\n<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>\n<style>\n:root{\n --bg:#f5f6f8;--panel:#ffffff;--text:#121417;--muted:#717782;\n --line:#e7e9ed;--dark:#15181d;--green:#178a4d;--yellow:#c97814;\n --red:#c33b32;--blue:#2f6f8f;--radius:18px;--shadow:0 8px 28px rgba(16,24,40,.055)\n}\n*{box-sizing:border-box}\nhtml,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}\nbody{min-height:100vh}\n.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}\n.sidebar{background:#12151a;color:white;padding:22px 15px;position:sticky;top:0;height:100vh}\n.logo{display:flex;align-items:center;gap:12px;padding:4px 8px 24px}\n.logo-mark{width:40px;height:40px;border-radius:12px;background:#fff;color:#111;display:grid;place-items:center;font-weight:900}\n.logo strong{display:block;font-size:17px}.logo small{color:#8f97a4}\n.group{margin:18px 8px 7px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#666f7c;font-weight:800}\n.nav a{display:flex;align-items:center;gap:11px;text-decoration:none;color:#bbc1cb;padding:10px 11px;border-radius:10px;margin:2px 0;font-size:14px}\n.nav a:hover,.nav a.active{color:white;background:#252a33}\n.nav i{font-style:normal;width:19px;text-align:center}\n.version{position:absolute;bottom:18px;left:18px;color:#66707e;font-size:11px}\nmain{padding:24px 28px 50px;max-width:1540px;width:100%;margin:auto}\n.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}\n.top h1{margin:0;font-size:24px}.top p{margin:4px 0 0;color:var(--muted);font-size:13px}\n.controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}\nselect,button{font:inherit}\nselect,.control{background:white;border:1px solid var(--line);border-radius:10px;padding:9px 12px}\n.control{cursor:pointer}.control.active{background:var(--dark);color:white;border-color:var(--dark)}\n.hero{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:14px}\n.hero-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--blue)}\n.hero h2{margin:8px 0 10px;font-size:27px;line-height:1.2}\n.hero p{margin:0;color:#505660;line-height:1.55;font-size:15px;max-width:930px}\n.hero-actions{display:flex;gap:8px;margin-top:16px}\n.hero-actions button{border:0;border-radius:10px;padding:9px 13px;cursor:pointer}\n.hero-actions .primary{background:var(--dark);color:#fff}.hero-actions .ghost{background:#eff1f4}\n.scorebox{border-left:1px solid var(--line);padding-left:20px;display:flex;flex-direction:column;justify-content:center}\n.scorebox small{color:var(--muted);text-transform:uppercase;letter-spacing:.1em}\n.score{font-size:56px;font-weight:850;line-height:1;margin:7px 0}.status{font-weight:700;font-size:13px}\n.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}\n.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}\n.kpi{padding:17px 18px}.kpi small{color:var(--muted)}.kpi strong{display:block;font-size:29px;margin:7px 0 5px}.delta{font-size:12px;font-weight:700}\n.good{color:var(--green)}.bad{color:var(--red)}.warn{color:var(--yellow)}.muted{color:var(--muted)}\n.grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px;margin-bottom:14px}\n.panel{padding:19px}.panel h3{margin:0;font-size:17px}.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.panel-head span{font-size:12px;color:var(--muted)}\n.attention{display:grid;gap:8px}\n.attn{display:grid;grid-template-columns:8px 1fr auto;gap:11px;padding:12px 13px;border:1px solid var(--line);border-radius:12px;align-items:start}\n.attn .rail{border-radius:99px;background:var(--yellow);height:100%;min-height:38px}.attn.critical .rail{background:var(--red)}.attn.ok .rail{background:var(--green)}\n.attn b{font-size:14px}.attn p{margin:4px 0 0;color:var(--muted);font-size:12px}.attn em{font-style:normal;font-size:11px;font-weight:800;white-space:nowrap}\n.quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}\n.quick-item{padding:13px;border:1px solid var(--line);border-radius:12px;background:#fafbfc}\n.quick-item small{color:var(--muted)}.quick-item b{display:block;margin-top:6px;font-size:18px}\n.status-list{display:grid;gap:0}.status-row{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--line)}\n.status-row:last-child{border-bottom:0}.status-row span:first-child{color:#555c66}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px}\n.chart{height:230px}\n.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}\n.empty{color:var(--muted);padding:18px 0;text-align:center}\n.footer{margin-top:12px;color:#8a9099;font-size:11px;text-align:right}\n@media(max-width:1080px){.shell{grid-template-columns:76px 1fr}.logo strong,.logo small,.group,.nav span,.version{display:none}.logo{justify-content:center}.nav a{justify-content:center}.kpis{grid-template-columns:repeat(2,1fr)}}\n@media(max-width:760px){.shell{display:block}.sidebar{position:static;height:auto;display:flex;overflow:auto;padding:8px}.logo,.group,.version{display:none}.nav{display:flex}.nav a{white-space:nowrap}.nav span{display:inline}.top{align-items:flex-start;gap:10px}.controls{display:none}main{padding:14px}.hero{grid-template-columns:1fr}.scorebox{border-left:0;border-top:1px solid var(--line);padding:16px 0 0}.kpis,.grid,.bottom-grid{grid-template-columns:1fr}.quick{grid-template-columns:1fr 1fr}}\n</style>\n</head>\n<body>\n<div class="shell">\n<aside class="sidebar">\n <div class="logo"><div class="logo-mark">R</div><div><strong>Restaurant OS</strong><small>Director workspace</small></div></div>\n <div class="nav">\n  <div class="group">Работа</div>\n  <a class="active" href="/dashboard-old"><i>⌂</i><span>Сегодня</span></a>\n  <a href="/dashboard-v5"><i>◫</i><span>Версия 5</span></a>\n  <a href="/dashboard-legacy"><i>↗</i><span>Старая панель</span></a>\n  <div class="group">Разделы</div>\n  <a href="/dashboard-legacy"><i>◆</i><span>Решения</span></a>\n  <a href="/dashboard-legacy"><i>◒</i><span>Меню</span></a>\n  <a href="/dashboard-legacy"><i>₽</i><span>Финансы</span></a>\n  <a href="/dashboard-legacy"><i>→</i><span>Доставка</span></a>\n </div>\n <div class="version">Restaurant OS 6.0.0</div>\n</aside>\n\n<main>\n <header class="top">\n  <div><h1>Рабочий стол директора</h1><p id="period-title">Сегодня</p></div>\n  <div class="controls">\n   <select id="agent"></select>\n   <button class="control active" data-period="today">Сегодня</button>\n   <button class="control" data-period="yesterday">Вчера</button>\n   <button class="control" data-period="week">7 дней</button>\n   <button class="control" onclick="loadAll()">Обновить</button>\n  </div>\n </header>\n\n <section class="hero">\n  <div>\n   <div class="hero-label">Цифровой управляющий</div>\n   <h2 id="brief-title">Анализирую состояние ресторана</h2>\n   <p id="brief-text">Загружаю показатели и формирую краткий вывод.</p>\n   <div class="hero-actions">\n    <button class="primary" onclick="document.getElementById(\'attention\').scrollIntoView({behavior:\'smooth\'})">Что делать сегодня</button>\n    <button class="ghost" onclick="location.href=\'/dashboard-legacy\'">Подробный анализ</button>\n   </div>\n  </div>\n  <div class="scorebox">\n   <small>Restaurant Score</small>\n   <div id="score" class="score">—</div>\n   <div id="score-status" class="status muted">Нет данных</div>\n  </div>\n </section>\n\n <section class="kpis">\n  <div class="card kpi"><small>Выручка</small><strong id="revenue">—</strong><div id="revenue-delta" class="delta muted">—</div></div>\n  <div class="card kpi"><small>Средний чек</small><strong id="avg">—</strong><div id="avg-delta" class="delta muted">—</div></div>\n  <div class="card kpi"><small>Чеков</small><strong id="checks">—</strong><div id="checks-delta" class="delta muted">—</div></div>\n  <div class="card kpi"><small>Темп периода</small><strong id="pace">—</strong><div id="pace-note" class="delta muted">к прошлому периоду</div></div>\n </section>\n\n <section class="grid">\n  <div class="card panel" id="attention">\n   <div class="panel-head"><h3>Что требует внимания</h3><span>только значимые сигналы</span></div>\n   <div id="attention-list" class="attention"><div class="empty">Анализирую данные…</div></div>\n  </div>\n\n  <div class="card panel">\n   <div class="panel-head"><h3>Экспресс-сводка</h3><span>деньги и касса</span></div>\n   <div class="quick">\n    <div class="quick-item"><small>Карта</small><b id="pay-card">Нет данных</b></div>\n    <div class="quick-item"><small>Наличные</small><b id="pay-cash">Нет данных</b></div>\n    <div class="quick-item"><small>Скидки</small><b id="discounts">Нет данных</b></div>\n    <div class="quick-item"><small>Возвраты</small><b id="returns">Нет данных</b></div>\n    <div class="quick-item"><small>Последний чек</small><b id="last-check">Нет данных</b></div>\n    <div class="quick-item"><small>Лидер продаж</small><b id="leader">—</b></div>\n   </div>\n  </div>\n </section>\n\n <section class="grid">\n  <div class="card panel">\n   <div class="panel-head"><h3>Продажи</h3><span>динамика выбранного периода</span></div>\n   <div id="sales-chart" class="chart"></div>\n  </div>\n\n  <div class="card panel">\n   <div class="panel-head"><h3>Ресторан сейчас</h3><span>оперативный статус</span></div>\n   <div class="status-list">\n    <div class="status-row"><span>Агент</span><b id="agent-status"><span class="dot"></span>Проверка</b></div>\n    <div class="status-row"><span>Последний сигнал</span><b id="last-seen">—</b></div>\n    <div class="status-row"><span>Последняя синхронизация</span><b id="last-sync">—</b></div>\n    <div class="status-row"><span>Пиковый час</span><b id="peak">—</b></div>\n    <div class="status-row"><span>Позиций класса C</span><b id="class-c">—</b></div>\n    <div class="status-row"><span>Прогноз периода</span><b id="forecast">—</b></div>\n   </div>\n  </div>\n </section>\n\n <section class="bottom-grid">\n  <div class="card panel">\n   <div class="panel-head"><h3>Лидеры продаж</h3><span>ключевые позиции</span></div>\n   <div id="leaders-list" class="status-list"><div class="empty">Нет данных</div></div>\n  </div>\n  <div class="card panel">\n   <div class="panel-head"><h3>Последние умные события</h3><span>без технических снимков</span></div>\n   <div id="events-list" class="attention"><div class="empty">Нет значимых событий</div></div>\n  </div>\n </section>\n\n <div class="footer">Оплаты, скидки и возвраты появятся после подключения соответствующих запросов TillyPad.</div>\n</main>\n</div>\n\n<script>\nlet agent=\'gastrodom3\',period=\'today\';\nconst money=v=>new Intl.NumberFormat(\'ru-RU\',{maximumFractionDigits:0}).format(Number(v||0))+\' ₽\';\nconst num=v=>new Intl.NumberFormat(\'ru-RU\',{maximumFractionDigits:0}).format(Number(v||0));\nconst iso=d=>d.toISOString().slice(0,10);\nconst dt=v=>v?new Date(v).toLocaleString(\'ru-RU\',{day:\'2-digit\',month:\'short\',hour:\'2-digit\',minute:\'2-digit\'}):\'—\';\nconst api=async u=>{const r=await fetch(u);if(!r.ok)throw new Error(await r.text());return r.json()};\nfunction periodRange(){\n const n=new Date(),s=new Date(n),e=new Date(n),ps=new Date(n),pe=new Date(n);\n if(period===\'today\'){ps.setDate(ps.getDate()-1);pe.setDate(pe.getDate()-1)}\n if(period===\'yesterday\'){s.setDate(s.getDate()-1);e.setDate(e.getDate()-1);ps.setDate(ps.getDate()-2);pe.setDate(pe.getDate()-2)}\n if(period===\'week\'){s.setDate(s.getDate()-6);ps.setDate(ps.getDate()-13);pe.setDate(pe.getDate()-7)}\n return {from:iso(s),to:iso(e),pfrom:iso(ps),pto:iso(pe)}\n}\nfunction aggregate(data){\n const rows=data?.rows||data||[];\n return rows.reduce((a,x)=>({revenue:a.revenue+Number(x.revenue||0),checks:a.checks+Number(x.checks_count||x.orders||0)}),{revenue:0,checks:0});\n}\nfunction change(cur,prev){\n if(!prev)return {raw:0,text:\'нет базы сравнения\',cls:\'muted\'};\n const raw=(cur-prev)/prev*100;\n return {raw,text:`${raw>=0?\'▲\':\'▼\'} ${Math.abs(raw).toFixed(1)}%`,cls:raw>=0?\'good\':\'bad\'};\n}\nfunction setDelta(id,d){const el=document.getElementById(id);el.textContent=d.text;el.className=\'delta \'+d.cls}\nasync function init(){\n const agents=await api(\'/api/web/agents\').catch(()=>[]);\n const sel=document.getElementById(\'agent\');\n sel.innerHTML=(agents||[]).map(x=>`<option value="${x.agent_id}">${x.name||x.agent_id}</option>`).join(\'\');\n agent=agents?.[0]?.agent_id||\'gastrodom3\';sel.value=agent;sel.onchange=()=>{agent=sel.value;loadAll()};\n document.querySelectorAll(\'[data-period]\').forEach(b=>b.onclick=()=>{document.querySelectorAll(\'[data-period]\').forEach(x=>x.classList.remove(\'active\'));b.classList.add(\'active\');period=b.dataset.period;loadAll()});\n loadAll();\n}\nasync function loadAll(){\n const r=periodRange();\n document.getElementById(\'period-title\').textContent=`${r.from}${r.from!==r.to?\' — \'+r.to:\'\'}`;\n const [history,prev,status,latest,menu,report,events]=await Promise.all([\n  api(`/api/web/${agent}/sales/history?date_from=${r.from}&date_to=${r.to}`).catch(()=>[]),\n  api(`/api/web/${agent}/sales/history?date_from=${r.pfrom}&date_to=${r.pto}`).catch(()=>[]),\n  api(`/api/web/${agent}/status`).catch(()=>({})),\n  api(`/api/web/${agent}/sales/latest`).catch(()=>({})),\n  api(`/api/web/${agent}/menu/history?date_from=${r.from}&date_to=${r.to}`).catch(()=>({})),\n  api(`/api/web/${agent}/ai/director?date_from=${r.from}&date_to=${r.to}&previous_from=${r.pfrom}&previous_to=${r.pto}`).catch(()=>null),\n  api(`/api/web/${agent}/events?limit=40`).catch(()=>[])\n ]);\n const cur=aggregate(history),old=aggregate(prev),avg=cur.checks?cur.revenue/cur.checks:0,oldAvg=old.checks?old.revenue/old.checks:0;\n const rd=change(cur.revenue,old.revenue),ad=change(avg,oldAvg),cd=change(cur.checks,old.checks);\n document.getElementById(\'revenue\').textContent=money(cur.revenue);\n document.getElementById(\'avg\').textContent=money(avg);\n document.getElementById(\'checks\').textContent=num(cur.checks);\n document.getElementById(\'pace\').textContent=(rd.raw>=0?\'+\':\'\')+rd.raw.toFixed(1)+\'%\';\n setDelta(\'revenue-delta\',rd);setDelta(\'avg-delta\',ad);setDelta(\'checks-delta\',cd);\n document.getElementById(\'pace-note\').className=\'delta \'+rd.cls;\n const score=report?.health_score?.score??report?.score??0;\n document.getElementById(\'score\').textContent=score||\'—\';\n const scoreStatus=score>=80?\'Хорошее состояние\':score>=60?\'Требует внимания\':score?\'Высокий риск\':\'Нет данных\';\n const se=document.getElementById(\'score-status\');se.textContent=scoreStatus;se.className=\'status \'+(score>=80?\'good\':score>=60?\'warn\':score?\'bad\':\'muted\');\n const top=getTop(menu);\n const leader=top[0]?.item_name||top[0]?.name||\'Не определён\';\n document.getElementById(\'leader\').textContent=leader;\n const online=Boolean(status?.online||status?.connected||status?.status===\'online\');\n document.getElementById(\'agent-status\').innerHTML=`<span class="dot" style="background:${online?\'var(--green)\':\'var(--red)\'}"></span>${online?\'Онлайн\':\'Не в сети\'}`;\n document.getElementById(\'last-seen\').textContent=dt(status?.last_seen_at||status?.last_heartbeat_at);\n document.getElementById(\'last-sync\').textContent=dt(latest?.captured_at||latest?.created_at);\n document.getElementById(\'peak\').textContent=latest?.peak_hour||\'Нет данных\';\n document.getElementById(\'class-c\').textContent=menu?.abc?.C?.count??menu?.class_c_count??\'Нет данных\';\n document.getElementById(\'last-check\').textContent=latest?.last_check_at?dt(latest.last_check_at):\'Нет данных\';\n [\'pay-card\',\'pay-cash\',\'discounts\',\'returns\'].forEach(id=>document.getElementById(id).textContent=\'Нет данных\');\n const forecast=period===\'today\'?cur.revenue*1.25:cur.revenue;\n document.getElementById(\'forecast\').textContent=money(forecast);\n const title=rd.raw>=5?\'Ресторан идёт лучше прошлого периода\':rd.raw<=-5?\'Темп продаж ниже прошлого периода\':\'Ресторан работает стабильно\';\n document.getElementById(\'brief-title\').textContent=title;\n document.getElementById(\'brief-text\').innerHTML=`Выручка — <b>${money(cur.revenue)}</b>, чеков — <b>${num(cur.checks)}</b>, средний чек — <b>${money(avg)}</b>. ${ad.raw<0?\'Средний чек требует внимания.\':\'Критических отклонений по среднему чеку нет.\'} Лидер продаж — <b>${leader}</b>.`;\n renderAttention(events,rd,ad,online,menu);\n renderEvents(events);\n renderLeaders(top);\n renderChart(history);\n}\nfunction getTop(menu){\n if(Array.isArray(menu?.top_items))return menu.top_items;\n if(Array.isArray(menu?.items))return menu.items;\n if(Array.isArray(menu?.rows))return menu.rows;\n return [];\n}\nfunction renderAttention(events,rd,ad,online,menu){\n const list=[];\n if(!online)list.push({c:\'critical\',t:\'Агент не в сети\',d:\'Свежие данные могут не поступать.\',e:\'Проверить\'});\n if(rd.raw<-5)list.push({c:\'critical\',t:\'Выручка отстаёт\',d:`Снижение ${Math.abs(rd.raw).toFixed(1)}% к прошлому периоду.`,e:\'Действие\'});\n if(ad.raw<-5)list.push({c:\'\',t:\'Средний чек снизился\',d:`Падение ${Math.abs(ad.raw).toFixed(1)}%.`,e:\'Комбо\'});\n const c=menu?.abc?.C?.count??menu?.class_c_count;\n if(Number(c)>0)list.push({c:\'\',t:`${c} позиций класса C`,d:\'Низкий вклад в выручку — нужен пересмотр.\',e:\'Меню\'});\n const smart=(events||[]).filter(x=>x.event_type!==\'snapshot_created\').slice(0,2);\n smart.forEach(x=>list.push({c:x.severity===\'critical\'?\'critical\':x.severity===\'success\'?\'ok\':\'\',t:x.title,d:x.description,e:x.source}));\n if(!list.length)list.push({c:\'ok\',t:\'Критических проблем нет\',d:\'Основные показатели находятся в нормальном диапазоне.\',e:\'Норма\'});\n document.getElementById(\'attention-list\').innerHTML=list.slice(0,5).map(x=>`<div class="attn ${x.c}"><div class="rail"></div><div><b>${x.t}</b><p>${x.d}</p></div><em>${x.e}</em></div>`).join(\'\');\n}\nfunction renderEvents(events){\n const smart=(events||[]).filter(x=>x.event_type!==\'snapshot_created\').slice(0,4);\n document.getElementById(\'events-list\').innerHTML=smart.length?smart.map(x=>`<div class="attn ${x.severity===\'critical\'?\'critical\':x.severity===\'success\'?\'ok\':\'\'}"><div class="rail"></div><div><b>${x.title}</b><p>${x.description}</p></div><em>${x.score||\'\'}</em></div>`).join(\'\'):\'<div class="empty">Значимых событий пока нет</div>\';\n}\nfunction renderLeaders(items){\n document.getElementById(\'leaders-list\').innerHTML=items.slice(0,5).map((x,i)=>`<div class="status-row"><span>${i+1}. ${x.item_name||x.name||\'Без названия\'}</span><b>${money(x.revenue||0)}</b></div>`).join(\'\')||\'<div class="empty">Нет данных</div>\';\n}\nfunction renderChart(history){\n const rows=history?.rows||history||[];\n const chart=echarts.init(document.getElementById(\'sales-chart\'));\n chart.setOption({grid:{left:45,right:12,top:18,bottom:32},tooltip:{trigger:\'axis\'},xAxis:{type:\'category\',boundaryGap:false,data:rows.map(x=>x.business_date||x.date||\'\')},yAxis:{type:\'value\'},series:[{type:\'line\',smooth:true,symbol:\'none\',lineStyle:{width:3},areaStyle:{opacity:.07},data:rows.map(x=>Number(x.revenue||0))}]});\n}\ninit().catch(e=>{document.getElementById(\'brief-title\').textContent=\'Не удалось загрузить данные\';document.getElementById(\'brief-text\').textContent=e.message});\n</script>\n</body>\n</html>\n')
 
     @router.get(
+        "/finance",
+        response_class=HTMLResponse,
+        include_in_schema=False,
+    )
+    def finance_page(request: Request):
+        require_browser_session(request)
+        return templates.TemplateResponse(
+            request=request,
+            name="finance.html",
+            context={
+                "app_version": "10.4.0",
+                "product_name": "Restaurant OS",
+            },
+        )
+
+    @router.get(
+        "/api/web/{agent_id}/finance/summary",
+        include_in_schema=False,
+    )
+    def web_finance_summary(
+        agent_id: str,
+        request: Request,
+        date_from: str,
+        date_to: str,
+    ):
+        require_browser_session(request)
+        return storage.finance_summary(
+            agent_id,
+            date_from,
+            date_to,
+        )
+
+    @router.post(
+        "/api/web/{agent_id}/finance/operations",
+        include_in_schema=False,
+    )
+    def create_web_finance_operation(
+        agent_id: str,
+        payload: FinanceOperationPayload,
+        request: Request,
+    ):
+        require_browser_session(request)
+        try:
+            return storage.create_finance_operation(
+                agent_id,
+                operation_date=payload.operation_date.isoformat(),
+                operation_type=payload.operation_type,
+                category=payload.category,
+                amount=payload.amount,
+                description=payload.description,
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                {"detail": str(exc)},
+                status_code=400,
+            )
+
+    @router.put(
+        "/api/web/{agent_id}/finance/operations/{operation_id}",
+        include_in_schema=False,
+    )
+    def update_web_finance_operation(
+        agent_id: str,
+        operation_id: int,
+        payload: FinanceOperationPayload,
+        request: Request,
+    ):
+        require_browser_session(request)
+        try:
+            return storage.update_finance_operation(
+                agent_id,
+                operation_id,
+                operation_date=payload.operation_date.isoformat(),
+                operation_type=payload.operation_type,
+                category=payload.category,
+                amount=payload.amount,
+                description=payload.description,
+            )
+        except KeyError:
+            return JSONResponse(
+                {"detail": "Операция не найдена"},
+                status_code=404,
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                {"detail": str(exc)},
+                status_code=400,
+            )
+
+    @router.delete(
+        "/api/web/{agent_id}/finance/operations/{operation_id}",
+        include_in_schema=False,
+    )
+    def delete_web_finance_operation(
+        agent_id: str,
+        operation_id: int,
+        request: Request,
+    ):
+        require_browser_session(request)
+        deleted = storage.delete_finance_operation(
+            agent_id,
+            operation_id,
+        )
+        if not deleted:
+            return JSONResponse(
+                {"detail": "Операция не найдена"},
+                status_code=404,
+            )
+        return {"ok": True}
+
+    @router.get(
         "/settings",
         response_class=HTMLResponse,
         include_in_schema=False,
@@ -917,7 +1037,7 @@ def setup_dashboard_routes(
             request=request,
             name="settings.html",
             context={
-                "app_version": "10.3.5",
+                "app_version": "10.4.0",
                 "product_name": "Restaurant OS",
             },
         )
@@ -959,7 +1079,7 @@ def setup_dashboard_routes(
             request=request,
             name="dashboard.html",
             context={
-                "app_version": "10.3.5",
+                "app_version": "10.4.0",
                 "product_name": "Restaurant OS",
             },
         )

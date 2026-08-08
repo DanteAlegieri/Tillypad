@@ -45,3 +45,88 @@
 }
 .payment-diagnostics-status.ok{color:var(--ros-color-success)}
 .payment-diagnostics-status.warning{color:var(--ros-color-warning)}
+
+
+/* 10.4.7 — Finance icon system */
+.finance-kpi--with-icon{
+ display:flex;
+ align-items:center;
+ gap:15px;
+}
+.finance-kpi-content{
+ min-width:0;
+ flex:1;
+}
+.finance-kpi-icon{
+ width:48px;
+ height:48px;
+ border-radius:14px;
+ display:grid;
+ place-items:center;
+ flex:0 0 48px;
+}
+.finance-kpi-icon svg{
+ width:25px;
+ height:25px;
+ fill:currentColor;
+}
+.finance-kpi-icon--revenue{
+ color:#2167a8;
+ background:#edf5fc;
+}
+.finance-kpi-icon--expense{
+ color:#d63a31;
+ background:#fff0ef;
+}
+.finance-kpi-icon--income{
+ color:#168a49;
+ background:#eef8f1;
+}
+.finance-kpi-icon--result{
+ color:#14924f;
+ background:#edf8f1;
+}
+
+.payment-card-icon{
+ width:42px;
+ height:42px;
+ border-radius:13px;
+ display:grid;
+ place-items:center;
+ flex:0 0 42px;
+}
+.payment-card-icon svg{
+ width:23px;
+ height:23px;
+ fill:currentColor;
+}
+.payment-card-icon--cash{
+ color:#158447;
+ background:#eaf7ef;
+}
+.payment-card-icon--card{
+ color:#226db2;
+ background:#edf5fc;
+}
+.payment-card-icon--qr{
+ color:#7140a3;
+ background:#f4effa;
+}
+.payment-card-icon--transfer{
+ color:#d9780f;
+ background:#fff3e6;
+}
+.payment-card-icon--bonus{
+ color:#b17a00;
+ background:#fff6dd;
+}
+.payment-card-icon--other{
+ color:#667085;
+ background:#f1f3f6;
+}
+
+@media(max-width:720px){
+ .finance-kpi--with-icon{
+  align-items:flex-start;
+ }
+}

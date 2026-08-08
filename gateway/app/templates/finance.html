@@ -5,9 +5,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Финансы — Restaurant OS</title>
-<link rel="stylesheet" href="/static/css/foundation.css?v=10.4.6">
-<link rel="stylesheet" href="/static/css/dashboard.css?v=10.4.6">
-<link rel="stylesheet" href="/static/css/finance.css?v=10.4.6">
+<link rel="stylesheet" href="/static/css/foundation.css?v=10.4.7">
+<link rel="stylesheet" href="/static/css/dashboard.css?v=10.4.7">
+<link rel="stylesheet" href="/static/css/finance.css?v=10.4.7">
 </head>
 <body>
 <div class="layout">
@@ -40,21 +40,41 @@
   </section>
 
   <section class="finance-kpis">
-   <article class="ros-card finance-kpi">
-    <span>Выручка</span><strong id="finance-revenue">—</strong>
-    <small>из продаж Restaurant OS</small>
+   <article class="ros-card finance-kpi finance-kpi--with-icon">
+    <div class="finance-kpi-icon finance-kpi-icon--revenue" aria-hidden="true">
+     <svg viewBox="0 0 24 24"><path d="M4 20V10h4v10H4Zm6 0V4h4v16h-4Zm6 0v-7h4v7h-4Z"/></svg>
+    </div>
+    <div class="finance-kpi-content">
+     <span>Выручка</span><strong id="finance-revenue">—</strong>
+     <small>из продаж Restaurant OS</small>
+    </div>
    </article>
-   <article class="ros-card finance-kpi">
-    <span>Расходы</span><strong id="finance-expenses">—</strong>
-    <small>ручные операции</small>
+   <article class="ros-card finance-kpi finance-kpi--with-icon">
+    <div class="finance-kpi-icon finance-kpi-icon--expense" aria-hidden="true">
+     <svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H17a2 2 0 0 1 2 2v1h1.2A1.8 1.8 0 0 1 22 8.8v6.4a1.8 1.8 0 0 1-1.8 1.8H19v1a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 17.5v-11Zm2 0v11a.5.5 0 0 0 .5.5H17v-1h-3.2A2.8 2.8 0 0 1 11 14.2V9.8A2.8 2.8 0 0 1 13.8 7H17V6H6.5a.5.5 0 0 0-.5.5ZM13 9.8v4.4c0 .44.36.8.8.8H20V9h-6.2a.8.8 0 0 0-.8.8Zm3 2.2h2v2h-2v-2Z"/></svg>
+    </div>
+    <div class="finance-kpi-content">
+     <span>Расходы</span><strong id="finance-expenses">—</strong>
+     <small>ручные операции</small>
+    </div>
    </article>
-   <article class="ros-card finance-kpi">
-    <span>Прочие доходы</span><strong id="finance-income">—</strong>
-    <small>не включая продажи</small>
+   <article class="ros-card finance-kpi finance-kpi--with-icon">
+    <div class="finance-kpi-icon finance-kpi-icon--income" aria-hidden="true">
+     <svg viewBox="0 0 24 24"><path d="M11 3h2v5h5v2h-5v11h-2V10H6V8h5V3Zm-6 9h4v2H7v5h10v-5h-2v-2h4v9H5v-9Z"/></svg>
+    </div>
+    <div class="finance-kpi-content">
+     <span>Прочие доходы</span><strong id="finance-income">—</strong>
+     <small>не включая продажи</small>
+    </div>
    </article>
-   <article class="ros-card finance-kpi finance-kpi--result">
-    <span>Операционный результат</span><strong id="finance-result">—</strong>
-    <small id="finance-margin">Рентабельность —</small>
+   <article class="ros-card finance-kpi finance-kpi--with-icon finance-kpi--result">
+    <div class="finance-kpi-icon finance-kpi-icon--result" aria-hidden="true">
+     <svg viewBox="0 0 24 24"><path d="m4 17 6-6 4 4 6-8v4h2V3h-8v2h4.2L13.8 11 10 7.2 2.6 14.6 4 17Z"/></svg>
+    </div>
+    <div class="finance-kpi-content">
+     <span>Операционный результат</span><strong id="finance-result">—</strong>
+     <small id="finance-margin">Рентабельность —</small>
+    </div>
    </article>
   </section>
 
@@ -149,6 +169,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<script src="/static/js/finance.js?v=10.4.6"></script>
+<script src="/static/js/finance.js?v=10.4.7"></script>
 </body>
 </html>

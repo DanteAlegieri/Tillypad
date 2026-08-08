@@ -105,13 +105,15 @@ function renderCategories(items){
 function renderPayments(payments,revenue){
  const node=byId("payment-types");
  const items=payments.items||[];
- const order=["cash","card","qr","transfer","bonus","other"];
+ const order=["cash","card","qr","transfer","staff_meal","owners","bonus","other"];
  const icons={
   cash:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3V6Zm2 2v8h14V8H5Zm7 1.5A3.5 3.5 0 1 1 12 16a3.5 3.5 0 0 1 0-7Zm0 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM6 9h2v2H6V9Zm10 4h2v2h-2v-2Z"/></svg>`,
   card:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 2v2h18V7H3Zm0 5v5h18v-5H3Zm13 2h4v2h-4v-2Z"/></svg>`,
   qr:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3V3Zm2 2v3h3V5H5Zm9-2h7v7h-7V3Zm2 2v3h3V5h-3ZM3 14h7v7H3v-7Zm2 2v3h3v-3H5Zm9-2h3v3h-3v-3Zm4 0h3v2h-1v2h-2v-4Zm-4 4h2v3h-2v-3Zm3 1h2v2h-2v-2Zm3-1h1v3h-1v-3Z"/></svg>`,
   transfer:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 3.7 10.2c-.8.34-.75 1.5.08 1.76l6.4 2.05L12.22 20c.27.8 1.35.91 1.78.18L21.8 4.4A1 1 0 0 0 21 3Zm-8.2 13.7-1.15-3.37 5.94-5.94-7.1 4.43-3.54-1.13 11.58-4.83-5.73 10.84Z"/></svg>`,
   bonus:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7h-2.2A3 3 0 0 0 12 5.8 3 3 0 0 0 6.2 7H4a2 2 0 0 0-2 2v3h9V9h2v3h9V9a2 2 0 0 0-2-2ZM9 7a1 1 0 1 1 1-1v1H9Zm5 0V6a1 1 0 1 1 1 1h-1ZM2 14h9v7H4a2 2 0 0 1-2-2v-5Zm11 0h9v5a2 2 0 0 1-2 2h-7v-7Z"/></svg>`,
+  staff_meal:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v7a3 3 0 0 1-2 2.82V22H5V11.82A3 3 0 0 1 3 9V2h2v5h2V2Zm10 0h2v20h-2v-8h-3a2 2 0 0 1-2-2V7a5 5 0 0 1 5-5Zm0 2.18A3 3 0 0 0 14 7v5h3V4.18Z"/></svg>`,
+  owners:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-2a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm0 4c-5 0-9 2.5-9 6v2h18v-2c0-3.5-4-6-9-6Zm-6.7 6c.55-2.05 3.35-4 6.7-4s6.15 1.95 6.7 4H5.3Z"/></svg>`,
   other:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm7 0a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm7 0a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>`
  };
  const byKey=Object.fromEntries(items.map(item=>[item.key,item]));

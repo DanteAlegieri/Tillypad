@@ -130,3 +130,14 @@
   align-items:flex-start;
  }
 }
+
+
+/* 10.4.8 — dedicated internal payment types */
+.payment-card-icon--staff_meal{
+ color:#0f8f8b;
+ background:#e8f7f6;
+}
+.payment-card-icon--owners{
+ color:#b8860b;
+ background:#fff7db;
+}

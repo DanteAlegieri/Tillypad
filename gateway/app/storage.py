@@ -682,6 +682,24 @@ class GatewayStorage:
         ):
             return ("bonus", "Бонусы")
 
+        if (
+            pid == "30615E66-4300-F443-BEF8-1E218503D4A2"
+            or "питание персонала" in lowered
+        ):
+            return (
+                "staff_meal",
+                "Питание персонала",
+            )
+
+        if (
+            pid == "049F0FE5-E753-D942-9501-2AE4A79A95A1"
+            or "собственник" in lowered
+        ):
+            return (
+                "owners",
+                "Собственники",
+            )
+
         return ("other", "Прочие")
 
     def payment_summary_history(
@@ -702,6 +720,8 @@ class GatewayStorage:
             "qr": {"key": "qr", "name": "QR / СБП", "amount": 0.0, "checks_count": 0},
             "transfer": {"key": "transfer", "name": "Перевод на карту", "amount": 0.0, "checks_count": 0},
             "bonus": {"key": "bonus", "name": "Бонусы", "amount": 0.0, "checks_count": 0},
+            "staff_meal": {"key": "staff_meal", "name": "Питание персонала", "amount": 0.0, "checks_count": 0},
+            "owners": {"key": "owners", "name": "Собственники", "amount": 0.0, "checks_count": 0},
             "other": {"key": "other", "name": "Прочие", "amount": 0.0, "checks_count": 0},
         }
         raw_types: dict[str, dict[str, Any]] = {}

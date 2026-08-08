@@ -32,6 +32,7 @@ class QueryRegistry:
             "menu_items": self.menu_items,
             "latest_sale": self.latest_sale,
             "payment_summary": self.payment_summary,
+            "purchases_summary": self.purchases_summary,
             "delivery_summary": self.delivery_summary,
             "basket_pairs": self.basket_pairs,
             "health_check": self.health_check,
@@ -231,6 +232,74 @@ class QueryRegistry:
                 p.pytp_Name,
                 p.pytp_IsCash
             ORDER BY amount DESC
+            """,
+            [date_from, date_to],
+        )
+
+
+    def purchases_summary(
+        self,
+        parameters: dict[str, Any],
+    ) -> tuple[str, list[Any]]:
+        date_from = self._require_date(
+            parameters.get("date_from"),
+            "date_from",
+        )
+        date_to = self._require_date(
+            parameters.get("date_to"),
+            "date_to",
+        )
+
+        return (
+            """
+            SELECT
+                d.idoc_ID AS document_id,
+                CONVERT(date, d.idoc_Date) AS document_date,
+                d.idoc_Name AS document_name,
+                d.idoc_ExternalName AS external_name,
+                d.idoc_part_ID AS supplier_id,
+                p.part_Name AS supplier_name,
+                d.idoc_stor_ID AS store_id,
+                d.idoc_idst_ID AS document_state,
+                COUNT(i.idit_ID) AS items_count,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN ISNULL(i.idit_IsDeleted, 0) = 0
+                            THEN CAST(i.idit_Sum AS decimal(18,4))
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS amount,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN ISNULL(i.idit_IsDeleted, 0) = 0
+                            THEN CAST(i.idit_SumVAT AS decimal(18,4))
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS vat_amount
+            FROM dbo.tp_InputDocuments AS d
+            INNER JOIN dbo.tp_InputDocumentItems AS i
+                ON i.idit_idoc_ID = d.idoc_ID
+            LEFT JOIN dbo.tp_Partners AS p
+                ON p.part_ID = d.idoc_part_ID
+            WHERE d.idoc_Date >= ?
+              AND d.idoc_Date < DATEADD(day, 1, ?)
+              AND d.idoc_idst_ID = 1
+            GROUP BY
+                d.idoc_ID,
+                CONVERT(date, d.idoc_Date),
+                d.idoc_Name,
+                d.idoc_ExternalName,
+                d.idoc_part_ID,
+                p.part_Name,
+                d.idoc_stor_ID,
+                d.idoc_idst_ID
+            ORDER BY d.idoc_Date, d.idoc_Name
             """,
             [date_from, date_to],
         )

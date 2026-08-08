@@ -144,6 +144,12 @@ class GatewayStorage:
                 "payments_json",
                 "TEXT NOT NULL DEFAULT '{}'",
             )
+            self._ensure_column(
+                connection,
+                "sales_snapshots",
+                "purchases_json",
+                "TEXT NOT NULL DEFAULT '{}'",
+            )
 
     @staticmethod
     def _ensure_column(
@@ -814,6 +820,129 @@ class GatewayStorage:
             "days_in_period": len(snapshots),
         }
 
+    def purchases_summary_history(
+        self,
+        agent_id: str,
+        date_from: str,
+        date_to: str,
+    ) -> dict[str, Any]:
+        snapshots = self.sales_history(
+            agent_id,
+            date_from,
+            date_to,
+        )
+
+        documents: dict[str, dict[str, Any]] = {}
+        daily: dict[str, float] = {}
+        suppliers: dict[str, float] = {}
+
+        for snapshot in snapshots:
+            purchases = snapshot.get("purchases") or {}
+            columns = list(purchases.get("columns") or [])
+            rows = list(purchases.get("rows") or [])
+
+            for row in rows:
+                values = dict(zip(columns, row))
+                document_id = str(
+                    values.get("document_id") or ""
+                )
+                if not document_id:
+                    continue
+
+                amount = round(
+                    float(values.get("amount") or 0),
+                    2,
+                )
+                vat_amount = round(
+                    float(values.get("vat_amount") or 0),
+                    2,
+                )
+                document_date = str(
+                    values.get("document_date")
+                    or snapshot.get("business_date")
+                    or ""
+                )
+                supplier_name = str(
+                    values.get("supplier_name")
+                    or "Поставщик не указан"
+                )
+                document_name = str(
+                    values.get("document_name")
+                    or values.get("external_name")
+                    or document_id
+                )
+
+                documents[document_id] = {
+                    "document_id": document_id,
+                    "document_date": document_date,
+                    "document_name": document_name,
+                    "supplier_id": str(
+                        values.get("supplier_id") or ""
+                    ),
+                    "supplier_name": supplier_name,
+                    "items_count": int(
+                        values.get("items_count") or 0
+                    ),
+                    "amount": amount,
+                    "vat_amount": vat_amount,
+                }
+
+        # Document id makes aggregation idempotent if history overlaps.
+        for document in documents.values():
+            day = document["document_date"]
+            daily[day] = round(
+                daily.get(day, 0.0)
+                + float(document["amount"]),
+                2,
+            )
+            supplier = document["supplier_name"]
+            suppliers[supplier] = round(
+                suppliers.get(supplier, 0.0)
+                + float(document["amount"]),
+                2,
+            )
+
+        total = round(
+            sum(
+                float(item["amount"])
+                for item in documents.values()
+            ),
+            2,
+        )
+        vat_total = round(
+            sum(
+                float(item["vat_amount"])
+                for item in documents.values()
+            ),
+            2,
+        )
+
+        return {
+            "total": total,
+            "vat_total": vat_total,
+            "documents_count": len(documents),
+            "documents": sorted(
+                documents.values(),
+                key=lambda item: (
+                    item["document_date"],
+                    item["document_name"],
+                ),
+                reverse=True,
+            ),
+            "daily": [
+                {"date": day, "amount": amount}
+                for day, amount in sorted(daily.items())
+            ],
+            "suppliers": [
+                {"supplier": supplier, "amount": amount}
+                for supplier, amount in sorted(
+                    suppliers.items(),
+                    key=lambda item: item[1],
+                    reverse=True,
+                )
+            ],
+        }
+
     def finance_summary(
         self,
         agent_id: str,
@@ -843,7 +972,7 @@ class GatewayStorage:
             ),
             2,
         )
-        expenses = round(
+        manual_expenses = round(
             sum(
                 float(item["amount"])
                 for item in operations
@@ -851,6 +980,21 @@ class GatewayStorage:
             ),
             2,
         )
+
+        purchases = self.purchases_summary_history(
+            agent_id,
+            date_from,
+            date_to,
+        )
+        purchase_expenses = round(
+            float(purchases.get("total") or 0),
+            2,
+        )
+        expenses = round(
+            manual_expenses + purchase_expenses,
+            2,
+        )
+
         operating_result = round(
             revenue + manual_income - expenses,
             2,
@@ -926,20 +1070,35 @@ class GatewayStorage:
             "date_to": date_to,
             "revenue": revenue,
             "manual_income": manual_income,
+            "manual_expenses": manual_expenses,
+            "purchase_expenses": purchase_expenses,
             "expenses": expenses,
+            "purchases": purchases,
             "operating_result": operating_result,
             "operating_margin": margin,
             "cost_of_goods": None,
             "gross_profit": None,
             "payments": payments,
-            "categories": [
-                {"category": key, "amount": value}
-                for key, value in sorted(
-                    categories.items(),
-                    key=lambda item: item[1],
-                    reverse=True,
+            "categories": (
+                (
+                    [
+                        {
+                            "category": "Закупки по приходным накладным",
+                            "amount": purchase_expenses,
+                        }
+                    ]
+                    if purchase_expenses > 0
+                    else []
                 )
-            ],
+                + [
+                    {"category": key, "amount": value}
+                    for key, value in sorted(
+                        categories.items(),
+                        key=lambda item: item[1],
+                        reverse=True,
+                    )
+                ]
+            ),
             "daily": [
                 {"date": day, **values}
                 for day, values in sorted(daily.items())
@@ -1089,6 +1248,7 @@ class GatewayStorage:
                 hourly_json = ?,
                 menu_json = ?,
                 payments_json = ?,
+                purchases_json = ?,
                 payload_json = ?,
                 received_at = ?
             WHERE id = (
@@ -1115,6 +1275,10 @@ class GatewayStorage:
                 ),
                 json.dumps(
                     payments,
+                    ensure_ascii=False,
+                ),
+                json.dumps(
+                    payload.get("purchases") or {},
                     ensure_ascii=False,
                 ),
                 json.dumps(
@@ -1163,10 +1327,11 @@ class GatewayStorage:
                     hourly_json,
                     menu_json,
                     payments_json,
+                    purchases_json,
                     payload_json,
                     received_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     agent_id,
@@ -1184,6 +1349,10 @@ class GatewayStorage:
                         self._normalize_snapshot_payments(
                             payload
                         ),
+                        ensure_ascii=False,
+                    ),
+                    json.dumps(
+                        payload.get("purchases") or {},
                         ensure_ascii=False,
                     ),
                     json.dumps(payload, ensure_ascii=False),
@@ -1215,6 +1384,9 @@ class GatewayStorage:
         )
         result["payments"] = json.loads(
             result.pop("payments_json", "{}") or "{}"
+        )
+        result["purchases"] = json.loads(
+            result.pop("purchases_json", "{}") or "{}"
         )
         result["payload"] = json.loads(result.pop("payload_json"))
         return result
@@ -1275,6 +1447,20 @@ class GatewayStorage:
                     payments = legacy_payments
 
             item["payments"] = payments
+            try:
+                item["purchases"] = json.loads(
+                    item.pop("purchases_json", "{}") or "{}"
+                )
+            except Exception:
+                item["purchases"] = {}
+            if not (
+                (item.get("purchases") or {}).get("rows")
+            ):
+                legacy_purchases = (
+                    payload.get("purchases") or {}
+                )
+                if legacy_purchases.get("rows"):
+                    item["purchases"] = legacy_purchases
             result.append(item)
         return result
 

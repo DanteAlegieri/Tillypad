@@ -47,6 +47,10 @@ function periodLabel(){
 function renderSummary(data){
  setText("finance-revenue",money(data.revenue));
  setText("finance-expenses",money(data.expenses));
+ setText(
+  "finance-expense-breakdown",
+  `накладные ${money(data.purchase_expenses||0)} · ручные ${money(data.manual_expenses||0)}`
+ );
  setText("finance-income",money(data.manual_income));
  setText("finance-result",money(data.operating_result));
  setText("finance-margin",data.operating_margin===null?"Рентабельность —":`Рентабельность ${data.operating_margin.toFixed(1)}%`);
@@ -62,6 +66,7 @@ function renderSummary(data){
  renderOperations(currentOperations);
  renderCategories(data.categories||[]);
  renderPayments(data.payments||{},data.revenue||0);
+ renderPurchases(data.purchases||{});
  renderInsights(data);
  renderChart(data.daily||[]);
 }
@@ -160,6 +165,35 @@ function renderPayments(payments,revenue){
  if(days&&periodDays&&days<periodDays){
   reconcile.textContent+=` · данные ${days}/${periodDays} дн.`;
  }
+}
+
+
+function renderPurchases(purchases){
+ setText("purchases-total",money(purchases.total||0));
+ setText("purchases-documents",String(purchases.documents_count||0));
+ setText("purchases-vat",money(purchases.vat_total||0));
+
+ const top=(purchases.suppliers||[])[0];
+ setText(
+  "purchases-top-supplier",
+  top?`${top.supplier} · ${money(top.amount)}`:"—"
+ );
+
+ const node=byId("purchases-list");
+ const documents=purchases.documents||[];
+ if(!documents.length){
+  node.innerHTML='<div class="finance-empty">За выбранный период проведённых приходных накладных нет</div>';
+  return;
+ }
+
+ node.innerHTML=documents.slice(0,12).map(item=>`
+  <div class="purchase-row">
+   <div>
+    <strong>${item.document_name||"Приходная накладная"}</strong>
+    <small>${item.document_date||"—"} · ${item.supplier_name||"Поставщик не указан"} · ${Number(item.items_count||0)} поз.</small>
+   </div>
+   <strong>${money(item.amount||0)}</strong>
+  </div>`).join("");
 }
 
 

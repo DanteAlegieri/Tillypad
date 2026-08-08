@@ -141,3 +141,54 @@
  color:#b8860b;
  background:#fff7db;
 }
+
+
+/* 10.4.9 — purchases from TillyPad input documents */
+.finance-purchases-panel{margin-bottom:14px}
+.purchases-summary{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:10px;
+ margin-bottom:14px;
+}
+.purchases-summary>div{
+ padding:12px 14px;
+ border-radius:12px;
+ background:var(--ros-color-soft);
+}
+.purchases-summary span{
+ display:block;
+ color:var(--ros-color-muted);
+ font-size:11px;
+ margin-bottom:5px;
+}
+.purchases-summary strong{
+ display:block;
+ font-size:14px;
+}
+.purchases-list{
+ display:grid;
+ gap:0;
+ border-top:1px solid var(--ros-color-border);
+}
+.purchase-row{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:16px;
+ padding:11px 4px;
+ border-bottom:1px solid var(--ros-color-border);
+}
+.purchase-row small{
+ display:block;
+ color:var(--ros-color-muted);
+ margin-top:4px;
+ font-size:11px;
+}
+.purchase-row>strong{
+ white-space:nowrap;
+}
+@media(max-width:720px){
+ .purchases-summary{grid-template-columns:1fr}
+ .purchase-row{align-items:flex-start}
+}

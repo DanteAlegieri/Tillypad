@@ -216,7 +216,7 @@ class WebSocketAgentClient:
             type="agent_hello",
             agent_id=self.agent_id,
             payload={
-                "agent_version": "31.4.2",
+                "agent_version": "31.5.0",
                 "hostname": platform.node(),
                 "database_name": os.environ.get(
                     "TILLYPAD_SQL_DATABASE",
@@ -436,8 +436,33 @@ class WebSocketAgentClient:
                 business_date,
                 exc,
             )
-            # Sales snapshot must continue even if payment analytics fails.
             payments = {
+                "columns": [],
+                "rows": [],
+                "row_count": 0,
+            }
+
+        purchase_sql, purchase_args = self.registry.build(
+            "purchases_summary",
+            period,
+        )
+        try:
+            purchases = self._execute_query(
+                purchase_sql,
+                purchase_args,
+            )
+            LOGGER.info(
+                "Приходные накладные: дата=%s, документов=%s",
+                business_date,
+                purchases.get("row_count", 0),
+            )
+        except Exception as exc:
+            LOGGER.exception(
+                "Ошибка purchases_summary за %s: %s",
+                business_date,
+                exc,
+            )
+            purchases = {
                 "columns": [],
                 "rows": [],
                 "row_count": 0,
@@ -459,7 +484,7 @@ class WebSocketAgentClient:
         )
 
         return {
-            "schema_version": 3,
+            "schema_version": 4,
             "agent_version": "31.4.1",
             "business_date": business_date,
             "captured_at": (
@@ -485,6 +510,10 @@ class WebSocketAgentClient:
             "payments": {
                 "columns": payments.get("columns") or [],
                 "rows": payments.get("rows") or [],
+            },
+            "purchases": {
+                "columns": purchases.get("columns") or [],
+                "rows": purchases.get("rows") or [],
             },
         }
 

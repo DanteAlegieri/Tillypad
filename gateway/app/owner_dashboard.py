@@ -926,7 +926,7 @@ def setup_dashboard_routes(
             request=request,
             name="finance.html",
             context={
-                "app_version": "10.4.8",
+                "app_version": "10.4.9",
                 "product_name": "Restaurant OS",
             },
         )
@@ -1072,7 +1072,7 @@ def setup_dashboard_routes(
             request=request,
             name="settings.html",
             context={
-                "app_version": "10.4.8",
+                "app_version": "10.4.9",
                 "product_name": "Restaurant OS",
             },
         )
@@ -1114,7 +1114,7 @@ def setup_dashboard_routes(
             request=request,
             name="dashboard.html",
             context={
-                "app_version": "10.4.8",
+                "app_version": "10.4.9",
                 "product_name": "Restaurant OS",
             },
         )
